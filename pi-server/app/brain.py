@@ -1,6 +1,7 @@
 """The thinking part: NVIDIA cloud LLM that answers and picks an action."""
 import json
 import re
+import time
 from collections import deque
 
 from . import config
@@ -36,7 +37,8 @@ def _llm():
     if _client is None:
         from openai import OpenAI
 
-        _client = OpenAI(base_url=config.NVIDIA_BASE_URL, api_key=config.NVIDIA_API_KEY)
+        _client = OpenAI(base_url=config.NVIDIA_BASE_URL, api_key=config.NVIDIA_API_KEY,
+                         timeout=15.0, max_retries=0)
     return _client
 
 
@@ -78,38 +80,42 @@ def current_model() -> str:
     return _model or config.NVIDIA_MODEL
 
 
-def _pick_model(failed: str) -> str | None:
-    """Ask NVIDIA which models exist and pick the best available one."""
-    try:
-        ids = {m.id for m in _llm().models.list().data}
-    except Exception:
-        return None
-    for m in PREFERRED_MODELS:
-        if m in ids and m != failed:
-            return m
-    chat = sorted(i for i in ids if ("instruct" in i or i.endswith("-it")) and not any(s in i for s in _SKIP) and i != failed)
-    return chat[0] if chat else None
+_available: list[str] | None = None
+
+
+def _candidates() -> list[str]:
+    """Configured model first, then the preferred models NVIDIA actually offers."""
+    global _available
+    if _available is None:
+        try:
+            ids = {m.id for m in _llm().models.list().data}
+            extra = sorted(i for i in ids if ("instruct" in i or i.endswith("-it"))
+                           and not any(s in i for s in _SKIP))
+            _available = list(dict.fromkeys([m for m in PREFERRED_MODELS if m in ids] + extra))
+        except Exception:
+            _available = list(PREFERRED_MODELS)
+    order = [current_model()] + [m for m in _available if m != current_model()]
+    return order[:5]
 
 
 def _chat(messages: list) -> str:
+    """Try models until one answers within 15 s; remember the one that worked."""
     global _model
-    from openai import APIStatusError, NotFoundError
-
-    for _ in range(3):
-        model = current_model()
+    last = None
+    for model in _candidates():
+        t = time.time()
         try:
             resp = _llm().chat.completions.create(
                 model=model, messages=messages, temperature=0.4, max_tokens=400)
+            if model != current_model():
+                print(f"[jarvis] now using model {model}", flush=True)
+                _model = model
+            print(f"[jarvis] {model} answered in {time.time() - t:.1f}s", flush=True)
             return resp.choices[0].message.content or ""
-        except (NotFoundError, APIStatusError) as e:
-            if getattr(e, "status_code", None) not in (404, 410):
-                raise
-            nxt = _pick_model(model)
-            if not nxt:
-                raise
-            print(f"[jarvis] model {model} is gone ({e.status_code}), switching to {nxt}", flush=True)
-            _model = nxt
-    raise RuntimeError("no working NVIDIA model found")
+        except Exception as e:  # timeout, gone, overloaded... try the next one
+            print(f"[jarvis] {model} failed after {time.time() - t:.1f}s: {type(e).__name__} {e}"[:300], flush=True)
+            last = e
+    raise RuntimeError(f"no NVIDIA model answered: {last}")
 
 
 def ask(text: str) -> dict:
