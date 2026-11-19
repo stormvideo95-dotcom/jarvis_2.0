@@ -55,7 +55,8 @@ async function load() {
     `<span class="pill">NVIDIA <b>${h.nvidia_key ? 'verbonden' : 'geen key'}</b></span>` +
     `<span class="pill">Model <b>${esc(h.model)}</b></span>` +
     `<span class="pill">Taal <b>${esc(h.language)}</b></span>` +
-    `<span class="pill">Speaker <b>${esc(h.nest)}</b></span>`;
+    `<span class="pill">Speaker <b>${esc(h.nest)}</b></span>` +
+    `<span class="pill">Home Assistant <b>${esc(h.home_assistant)}</b></span>`;
   const b = await api('/api/board');
   document.getElementById('pills').innerHTML +=
     `<span class="pill">Board <b>${b.last_seen ? 'gezien ' + esc(b.last_seen) : 'nog niet gezien'}</b>${b.rssi ? ' · wifi ' + esc(b.rssi) + ' dBm' : ''}</span>`;

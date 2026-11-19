@@ -16,7 +16,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import brain, config, music, stt, tts
+from . import brain, config, ha, music, stt, tts
 from .nest import Nest
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -72,7 +72,7 @@ def _skip():
 
 
 def handle_text(text: str) -> dict:
-    reply = brain.ask(text)
+    reply = brain.ask(text, ha.prompt_block())
     action = reply["action"] or {}
     kind = action.get("type")
     log.info("heard=%r say=%r action=%r", text, reply["say"], action)
@@ -80,6 +80,9 @@ def handle_text(text: str) -> dict:
     if kind in SILENT_ACTIONS:
         {"pause": nest.pause, "resume": nest.resume, "stop": nest.stop, "skip": _skip,
          "volume": lambda: nest.volume(action.get("level", 50))}[kind]()
+    elif kind == "home":
+        problem = ha.run(action) if ha.enabled() else "Home Assistant is nog niet gekoppeld."
+        say(problem or reply["say"])
     elif kind == "play_music":
         query = action.get("query") or text
         say(reply["say"], then=lambda: _play_query(query))
@@ -217,6 +220,7 @@ async def text(msg: TextIn, x_jarvis_key: str = Header(default="")):
 def health():
     return {"ok": True, "nvidia_key": bool(config.NVIDIA_API_KEY), "model": brain.current_model(),
             "language": config.LANGUAGE,
+            "home_assistant": ("verbonden" if ha.ping() else "fout") if ha.enabled() else "niet gekoppeld",
             "nest": (lambda s: s["name"] or s["ip"] or "auto")(nest.chosen())}
 
 

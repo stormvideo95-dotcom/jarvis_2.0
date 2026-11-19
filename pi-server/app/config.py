@@ -26,3 +26,9 @@ PIPER_VOICE = _env("PIPER_VOICE", "/voices/nl_BE-nathalie-medium.onnx")
 AUDIO_DIR = _env("AUDIO_DIR", "/tmp/jarvis-audio")
 # Written by `python -m app.pick_speaker`; overrides NEST_NAME / NEST_IP when present
 SPEAKER_FILE = _env("SPEAKER_FILE", "/data/speaker.json")
+
+# Home Assistant (on the same Umbrel by default)
+HA_URL = _env("HA_URL", "http://127.0.0.1:8123")
+HA_TOKEN = _env("HA_TOKEN", "")
+# Device types Jarvis may control. Locks, alarms, garage doors are left out on purpose.
+HA_DOMAINS = {d.strip() for d in _env("HA_DOMAINS", "light,switch,scene,fan,climate,input_boolean").split(",") if d.strip()}

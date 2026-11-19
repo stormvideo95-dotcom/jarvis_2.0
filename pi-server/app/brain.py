@@ -27,7 +27,7 @@ Voorbeelden:
 "hoe ver is de maan" -> {"say": "Gemiddeld zo'n 384.000 kilometer.", "action": null}
 """
 
-ACTIONS = {"play_music", "pause", "resume", "skip", "stop", "volume", "timer"}
+ACTIONS = {"home", "play_music", "pause", "resume", "skip", "stop", "volume", "timer"}
 
 _history: deque = deque(maxlen=8)  # last 4 exchanges
 _client = None
@@ -169,8 +169,8 @@ def _chat(messages: list) -> str:
     raise RuntimeError(f"no NVIDIA model answered: {last}")
 
 
-def ask(text: str) -> dict:
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}, *_history,
+def ask(text: str, extra: str = "") -> dict:
+    messages = [{"role": "system", "content": SYSTEM_PROMPT + extra}, *_history,
                 {"role": "user", "content": text}]
     raw = _chat(messages)
     raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.S)  # reasoning models

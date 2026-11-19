@@ -55,6 +55,28 @@ if command -v ss >/dev/null && ss -ltn | grep -q ":$PORT " && ! $DOCKER ps --for
 fi
 JKEY=$(grep '^JARVIS_KEY=' .env | cut -d= -f2-)
 
+# ---- Home Assistant link (asked once) ----
+if ! grep -q '^HA_URL=' .env; then
+  printf '\n# Home Assistant\nHA_URL=http://127.0.0.1:8123\nHA_TOKEN=\nHA_DOMAINS=light,switch,scene,fan,climate,input_boolean\n' >> .env
+fi
+if [ -z "$(grep '^HA_TOKEN=' .env | cut -d= -f2-)" ] && [ ! -f data/.ha_skipped ]; then
+  say "Connect Home Assistant (optional)"
+  echo "In Home Assistant: click your name (bottom left) -> Security -> Long-lived access tokens -> Create token."
+  printf "Paste the Home Assistant token (or press Enter to skip): " > $TTY
+  read -rs HATOKEN < $TTY; echo > $TTY
+  if [ -n "$HATOKEN" ]; then
+    sed -i "s#^HA_TOKEN=.*#HA_TOKEN=$HATOKEN#" .env
+    if curl -fsS -m 5 -H "Authorization: Bearer $HATOKEN" http://127.0.0.1:8123/api/ >/dev/null 2>&1; then
+      ok "Home Assistant connected"
+    else
+      echo "Saved, but Home Assistant did not answer on http://127.0.0.1:8123 yet. Check the token or HA_URL in $DIR/.env"
+    fi
+  else
+    touch data/.ha_skipped
+    echo "Skipped. To add it later: rm $DIR/data/.ha_skipped and run this install again."
+  fi
+fi
+
 say "Building and starting Jarvis (first time takes a few minutes)"
 $DOCKER compose up -d --build
 ok "Jarvis is running"
