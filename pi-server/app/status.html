@@ -41,6 +41,7 @@
   <h1>Jarvis 2.0</h1>
   <p class="sub">Hou BOOT op je ronde board ingedrukt en praat. Of typ hieronder.</p>
   <div class="pills" id="pills"><span class="pill">laden…</span></div>
+  <div class="card" id="musiccode" style="display:none"></div>
   <div class="card">
     <h2>Hoe start je Jarvis?</h2>
     <div class="seg"><button id="m-button" type="button">Knop (BOOT)</button><button id="m-wake" type="button">Wake word</button></div>
@@ -75,7 +76,14 @@ async function load() {
     `<span class="pill">Model <b>${esc(h.model)}</b></span>` +
     `<span class="pill">Taal <b>${esc(h.language)}</b></span>` +
     `<span class="pill">Speaker <b>${esc(h.nest)}</b></span>` +
-    `<span class="pill">Home Assistant <b>${esc(h.home_assistant)}</b></span>`;
+    `<span class="pill">Home Assistant <b>${esc(h.home_assistant)}</b></span>` +
+    `<span class="pill">Music AI <b>${h.music_ai.paired ? 'gekoppeld' : (h.music_ai.code ? 'code ' + esc(h.music_ai.code) : esc(h.music_ai.error || 'koppelen…'))}</b></span>`;
+  const mc = document.getElementById('musiccode');
+  if (h.music_ai.code && !h.music_ai.paired) {
+    mc.style.display = '';
+    mc.innerHTML = `<h2>Koppel Jarvis aan Music AI</h2><div style="font-size:34px;letter-spacing:6px;font-weight:700;color:var(--accent)">${esc(h.music_ai.code)}</div>
+      <p class="hint">Open Music AI op je gsm → Instellingen → Taste AI → <b>Add a device</b> en typ deze code. Daarna staat "Jarvis (Nest)" in je Play on-lijst.</p>`;
+  } else { mc.style.display = 'none'; }
   const b = await api('/api/board');
   document.getElementById('pills').innerHTML +=
     `<span class="pill">Board <b>${b.last_seen ? 'gezien ' + esc(b.last_seen) : 'nog niet gezien'}</b>${b.rssi ? ' · wifi ' + esc(b.rssi) + ' dBm' : ''}</span>`;

@@ -46,6 +46,13 @@ The Pi installer asks once for a Home Assistant long-lived token
 lights, switches, scenes, fans and the thermostat (`HA_DOMAINS` in `.env`) and read temperatures.
 Locks, alarms and garage doors are left out on purpose.
 
+## Music AI (phone ↔ Nest ↔ Mac)
+
+Jarvis joins your Music AI taste server (`MUSIC_AI_URL`, default `http://127.0.0.1:8765`) as the device **Jarvis (Nest)**.
+First time: the Jarvis page shows a 6-digit code → Music AI app → Settings → Taste AI → **Add a device**.
+Then: *"speel mijn gsm hier verder"*, *"zet het verder op mijn Mac"*, or use **Play on → Jarvis (Nest)** in the app.
+No APK update needed.
+
 ## Things you can say
 
 | Say | Jarvis does |

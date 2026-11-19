@@ -16,7 +16,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import brain, config, ha, music, settings, stt, tts
+from . import brain, config, ha, music, musicsync, settings, stt, tts
 from .wake import WakeListener
 from .nest import Nest
 
@@ -64,6 +64,62 @@ def _play_query(query: str):
         say("Ik vond daar geen muziek voor.")
 
 
+def _play_tracks(tracks: list, start_ms: int = 0):
+    track = music.set_queue(tracks)
+    if track:
+        nest.play_track(track, start_ms / 1000.0)
+    else:
+        say("Dat nummer kon ik niet afspelen.")
+
+
+def _music_command(cmd: dict):
+    """'Play on Jarvis (Nest)' from the Music AI app."""
+    action = cmd.get("action")
+    if action == "play":
+        tracks = ([cmd["track"]] if cmd.get("track") else []) + (cmd.get("queue") or [])
+        if tracks:
+            log.info("Music AI: play from %s", cmd.get("from"))
+            _play_tracks(tracks, int(cmd.get("positionMs") or 0))
+    elif action == "pause":
+        try:
+            nest.pause()
+        except Exception:
+            pass
+
+
+def _music_state() -> dict:
+    cur = music.current()
+    try:
+        state, pos = nest.music_status() if cur else (None, 0.0)
+    except Exception:
+        state, pos = None, 0.0
+    return {"track": cur if state else None, "positionMs": int(pos * 1000),
+            "playing": state in ("PLAYING", "BUFFERING"),
+            "queue": music.upcoming() if state else [], "updatedAt": int(time.time() * 1000)}
+
+
+def _autoplay_loop():
+    """When Jarvis' song finishes on the Nest, play the next one in the queue."""
+    while True:
+        time.sleep(3)
+        try:
+            state, _ = nest.music_status()
+            if state == "FINISHED":
+                nxt = music.next_track()
+                if nxt:
+                    nest.play_track(nxt)
+                else:
+                    nest.music = None
+        except Exception:
+            pass
+
+
+@app.on_event("startup")
+def _start_music():
+    musicsync.start(_music_command, _music_state)
+    threading.Thread(target=_autoplay_loop, daemon=True).start()
+
+
 def _skip():
     track = music.next_track()
     if track:
@@ -73,7 +129,7 @@ def _skip():
 
 
 def handle_text(text: str) -> dict:
-    reply = brain.ask(text, ha.prompt_block())
+    reply = brain.ask(text, ha.prompt_block() + musicsync.prompt_block())
     action = reply["action"] or {}
     kind = action.get("type")
     log.info("heard=%r say=%r action=%r", text, reply["say"], action)
@@ -84,6 +140,26 @@ def handle_text(text: str) -> dict:
     elif kind == "home":
         problem = ha.run(action) if ha.enabled() else "Home Assistant is nog niet gekoppeld."
         say(problem or reply["say"])
+    elif kind == "music_from":
+        tracks, start_ms, dev = musicsync.take_from(action.get("device", ""))
+        if not dev:
+            say("Ik vond dat toestel niet in Music AI.")
+        elif not tracks:
+            say(f"Er speelt niets op {dev['name']}.")
+        else:
+            say(reply["say"], then=lambda: _play_tracks(tracks, start_ms))
+    elif kind == "music_to":
+        cur = music.current()
+        state, pos = nest.music_status() if cur else (None, 0.0)
+        if not cur or state is None:
+            say("Er speelt hier nu geen muziek om door te geven.")
+        else:
+            dev = musicsync.send_to(action.get("device", ""), cur, int(pos * 1000), music.upcoming())
+            if dev:
+                nest.stop()
+                say(reply["say"] or f"Het speelt nu verder op {dev['name']}.")
+            else:
+                say("Ik vond dat toestel niet in Music AI.")
     elif kind == "play_music":
         query = action.get("query") or text
         say(reply["say"], then=lambda: _play_query(query))
@@ -278,6 +354,7 @@ def health():
     return {"ok": True, "nvidia_key": bool(config.NVIDIA_API_KEY), "model": brain.current_model(),
             "language": config.LANGUAGE,
             "home_assistant": ("verbonden" if ha.ping() else "fout") if ha.enabled() else "niet gekoppeld",
+            "music_ai": musicsync.status(),
             "nest": (lambda s: s["name"] or s["ip"] or "auto")(nest.chosen())}
 
 

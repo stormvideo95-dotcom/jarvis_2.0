@@ -90,10 +90,23 @@ class Nest:
                     self._play(self.music["url"], self.music["type"], self.music["title"], resume_at)
         threading.Thread(target=run, daemon=True).start()
 
-    def play_track(self, track: dict):
+    def play_track(self, track: dict, start: float = 0.0):
         with self._lock:
             self.music = track
-            self._play(track["url"], track["type"], track["title"])
+            self._play(track["url"], track["type"], track["title"], start)
+
+    def music_status(self):
+        """(state, seconds) of Jarvis' own song on the Nest; state is None if something else plays."""
+        if not self.music or self._cast is None:
+            return None, 0.0
+        st = self._mc().status
+        if st.content_id != self.music["url"]:
+            return None, 0.0
+        pos = float(getattr(st, "adjusted_current_time", None) or st.current_time or 0.0)
+        state = st.player_state
+        if state == "IDLE" and getattr(st, "idle_reason", None) == "FINISHED":
+            state = "FINISHED"
+        return state, pos
 
     def pause(self):
         self._mc().pause()

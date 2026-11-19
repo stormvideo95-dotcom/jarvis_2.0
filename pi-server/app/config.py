@@ -33,3 +33,6 @@ HA_URL = _env("HA_URL", "http://127.0.0.1:8123")
 HA_TOKEN = _env("HA_TOKEN", "")
 # Device types Jarvis may control. Locks, alarms, garage doors are left out on purpose.
 HA_DOMAINS = {d.strip() for d in _env("HA_DOMAINS", "light,switch,scene,fan,climate,input_boolean").split(",") if d.strip()}
+
+# Music AI taste server (same Pi) so Jarvis can take over / hand off songs
+MUSIC_AI_URL = _env("MUSIC_AI_URL", "http://127.0.0.1:8765")
