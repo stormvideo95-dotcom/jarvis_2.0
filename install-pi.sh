@@ -32,10 +32,20 @@ if [ ! -f .env ]; then
   JKEY=$(head -c 12 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 16)
   sed -i "s#^NVIDIA_API_KEY=.*#NVIDIA_API_KEY=$NVKEY#" .env
   sed -i "s#^JARVIS_KEY=.*#JARVIS_KEY=$JKEY#" .env
-  sed -i "s#^PUBLIC_URL=.*#PUBLIC_URL=http://$PI_IP:8765#" .env
+  sed -i "s#^PUBLIC_URL=.*#PUBLIC_URL=http://$PI_IP:8790#" .env
   ok "Saved .env (Pi IP $PI_IP)"
 else
   ok "Keeping your existing .env"
+  # Jarvis moved from port 8765 (clashed with another app) to 8790
+  if grep -q '^PORT=8765' .env; then
+    sed -i 's#^PORT=8765#PORT=8790#; s#:8765#:8790#g' .env
+    ok "Moved Jarvis to port 8790"
+  fi
+fi
+PORT=$(grep '^PORT=' .env | cut -d= -f2-); PORT=${PORT:-8790}
+if command -v ss >/dev/null && ss -ltn | grep -q ":$PORT " && ! $DOCKER ps --format '{{.Names}}' | grep -qx jarvis; then
+  echo "Port $PORT is already used by another app. Change PORT and PUBLIC_URL in $DIR/.env, then run this again."
+  exit 1
 fi
 JKEY=$(grep '^JARVIS_KEY=' .env | cut -d= -f2-)
 
@@ -50,13 +60,13 @@ $DOCKER exec -it jarvis python -m app.pick_speaker < $TTY || echo "Run later: $D
 cat <<EOF
 
 ────────────────────────────────────────────────────────────
-  Jarvis 2.0 is live:  http://$PI_IP:8765
+  Jarvis 2.0 is live:  http://$PI_IP:$PORT
 
   Now flash the round board (Chrome on your Mac, board on USB-C):
   https://stormvideo95-dotcom.github.io/jarvis_2.0/
 
   In the phone setup page ("Jarvis-Setup" Wi-Fi) fill in:
-    Jarvis on the Pi:  http://$PI_IP:8765
+    Jarvis on the Pi:  http://$PI_IP:$PORT
     Jarvis key:        $JKEY
 
   Change speaker later:  $DOCKER exec -it jarvis python -m app.pick_speaker

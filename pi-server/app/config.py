@@ -18,8 +18,8 @@ LANGUAGE = _env("LANGUAGE", "nl")  # "nl", "en" or "multi" (auto detect)
 NEST_NAME = _env("NEST_NAME", "")  # friendly name in Google Home, e.g. "Kamer van Storm"
 NEST_IP = _env("NEST_IP", "")      # optional, faster + more reliable than discovery
 
-PUBLIC_URL = _env("PUBLIC_URL", "http://192.168.1.10:8765").rstrip("/")
-PORT = int(_env("PORT", "8765"))
+PUBLIC_URL = _env("PUBLIC_URL", "http://192.168.1.10:8790").rstrip("/")
+PORT = int(_env("PORT", "8790"))
 JARVIS_KEY = _env("JARVIS_KEY", "")  # shared secret the board sends
 
 PIPER_VOICE = _env("PIPER_VOICE", "/voices/nl_BE-nathalie-medium.onnx")

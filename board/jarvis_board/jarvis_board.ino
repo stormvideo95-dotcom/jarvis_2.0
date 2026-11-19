@@ -70,7 +70,7 @@ String htmlEscape(const String &in) {
 }
 
 String setupPage(const String &options) {
-  String url = cfgUrl.length() ? cfgUrl : "http://192.168.1.10:8765";
+  String url = cfgUrl.length() ? cfgUrl : "http://192.168.1.10:8790";
   String h = F("<!doctype html><html><head><meta charset='utf-8'>"
     "<meta name='viewport' content='width=device-width,initial-scale=1'><title>Jarvis setup</title>"
     "<style>body{margin:0;font-family:system-ui,sans-serif;background:#0b0d12;color:#e8ebf2}"

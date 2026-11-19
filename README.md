@@ -30,7 +30,7 @@ Then press RST, join the Wi-Fi **Jarvis-Setup** with your phone and fill in your
 
 - Change speaker: `docker exec -it jarvis python -m app.pick_speaker` (add `sudo` if needed)
 - Update Jarvis: run the Pi command again (your `.env` is kept)
-- Logs: `docker logs -f jarvis` · Status page: `http://<pi-ip>:8765`
+- Logs: `docker logs -f jarvis` · Status page: `http://<pi-ip>:8790`
 - Flash fails? Hold BOOT, press RST, let go of BOOT, click Flash again.
 
 ## Things you can say
