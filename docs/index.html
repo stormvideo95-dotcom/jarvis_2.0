@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flash Jarvis 2.0</title>
+<script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+<style>
+  :root { --bg:#0b0d12; --card:#151924; --line:#262c3b; --text:#e8ebf2; --muted:#8b93a7; --accent:#ffb020; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:var(--bg); color:var(--text); }
+  main { max-width: 620px; margin: 0 auto; padding: 48px 20px; }
+  .orb { width:72px; height:72px; border-radius:50%; border:3px solid var(--accent); display:grid; place-items:center; margin-bottom:16px; }
+  .orb span { width:28px; height:28px; border-radius:50%; background:var(--accent); }
+  h1 { margin:0 0 6px; font-size:30px; font-weight:600; }
+  .sub { color:var(--muted); margin:0 0 28px; }
+  .step { display:flex; gap:14px; background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px; margin-bottom:12px; }
+  .num { flex:none; width:30px; height:30px; border-radius:50%; background:var(--accent); color:#1b1200; display:grid; place-items:center; font-weight:700; }
+  .step h3 { margin:2px 0 4px; font-size:16px; font-weight:600; }
+  .step p { margin:0; color:var(--muted); font-size:14px; line-height:1.5; }
+  .flash { margin: 18px 0 30px; }
+  esp-web-install-button button, .btn { background:var(--accent); color:#1b1200; border:0; border-radius:14px; padding:16px 26px; font-size:17px; font-weight:700; cursor:pointer; }
+  .warn { background:#2a1d08; border:1px solid #5a3d0c; color:#ffd58a; border-radius:12px; padding:12px 14px; font-size:14px; }
+  code { background:#0f1219; border:1px solid var(--line); border-radius:6px; padding:1px 6px; }
+</style>
+</head>
+<body>
+<main>
+  <div class="orb"><span></span></div>
+  <h1>Flash Jarvis 2.0</h1>
+  <p class="sub">For the Waveshare ESP32-S3 1.85" round board. Nothing to install.</p>
+
+  <div class="step"><div class="num">1</div><div>
+    <h3>Plug the board into your Mac</h3>
+    <p>Use a USB-C cable that does data. Use Chrome or Edge (Safari can't flash).</p>
+  </div></div>
+
+  <div class="step"><div class="num">2</div><div>
+    <h3>Click the button and pick the board</h3>
+    <p>Choose the port that says <code>USB JTAG/serial</code> or <code>usbmodem</code>. Say yes to "erase" the first time.</p>
+  </div></div>
+
+  <div class="flash">
+    <esp-web-install-button manifest="manifest.json">
+      <button slot="activate">Flash Jarvis</button>
+      <span slot="unsupported"><div class="warn">This browser can't flash boards. Open this page in Chrome or Edge on your Mac.</div></span>
+      <span slot="not-allowed"><div class="warn">Open this page over https to flash.</div></span>
+    </esp-web-install-button>
+  </div>
+
+  <div class="step"><div class="num">3</div><div>
+    <h3>Set up Wi-Fi from your phone</h3>
+    <p>Press <b>RST</b> on the board. On your phone, join the Wi-Fi <code>Jarvis-Setup</code>. A setup page opens
+    (if not, go to <code>192.168.4.1</code>). Pick your Wi-Fi, type the password, the Pi address
+    (<code>http://PI-IP:8765</code>) and the Jarvis key. Both are shown at the end of the Pi install.</p>
+  </div></div>
+
+  <div class="step"><div class="num">4</div><div>
+    <h3>Talk to Jarvis</h3>
+    <p>Hold <b>BOOT</b>, talk, let go. Jarvis answers on your Nest. New Wi-Fi or Pi address later?
+    Hold BOOT for 10 seconds and the setup hotspot opens again.</p>
+  </div></div>
+
+  <div class="warn">Flashing stuck or no port? Hold BOOT, press RST, let go of BOOT, then click Flash again.</div>
+</main>
+</body>
+</html>

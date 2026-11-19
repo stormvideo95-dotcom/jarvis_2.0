@@ -52,10 +52,12 @@ cat <<EOF
 ────────────────────────────────────────────────────────────
   Jarvis 2.0 is live:  http://$PI_IP:8765
 
-  Now flash the round board. Paste this in your MAC terminal
-  (with the board plugged in over USB-C):
+  Now flash the round board (Chrome on your Mac, board on USB-C):
+  https://stormvideo95-dotcom.github.io/jarvis_2.0/
 
-  curl -fsSL https://raw.githubusercontent.com/$REPO/main/flash-mac.sh | PI_IP=$PI_IP JARVIS_KEY=$JKEY bash
+  In the phone setup page ("Jarvis-Setup" Wi-Fi) fill in:
+    Jarvis on the Pi:  http://$PI_IP:8765
+    Jarvis key:        $JKEY
 
   Change speaker later:  $DOCKER exec -it jarvis python -m app.pick_speaker
   Update Jarvis later:   run the same install command again

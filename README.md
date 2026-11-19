@@ -17,22 +17,21 @@ curl -fsSL https://raw.githubusercontent.com/stormvideo95-dotcom/jarvis_2.0/main
 ```
 
 It asks for your NVIDIA key once, finds the Pi's IP, builds and starts Jarvis, and lets you pick your Nest speaker.
-At the end it prints the Mac command below **with your Pi IP and key already filled in**.
+At the end it prints the Pi address and Jarvis key you need for the board setup.
 
-**2. On your Mac** (round board plugged in with USB-C):
+**2. Flash the board** (Chrome on your Mac, board on USB-C), nothing to install:
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/stormvideo95-dotcom/jarvis_2.0/main/flash-mac.sh | PI_IP=<pi-ip> JARVIS_KEY=<key> bash
-```
+👉 **https://stormvideo95-dotcom.github.io/jarvis_2.0/**
 
-It installs arduino-cli + ESP32 support (first time only), asks your Wi-Fi name and password, and flashes the board.
+Then press RST, join the Wi-Fi **Jarvis-Setup** with your phone and fill in your Wi-Fi, the Pi address and the Jarvis key
+(the Pi install prints both). Hold BOOT 10 s any time to open that setup again.
 
 ### Handy later
 
 - Change speaker: `docker exec -it jarvis python -m app.pick_speaker` (add `sudo` if needed)
 - Update Jarvis: run the Pi command again (your `.env` is kept)
 - Logs: `docker logs -f jarvis` · Status page: `http://<pi-ip>:8765`
-- Flash fails? Hold BOOT, press RST, let go of BOOT, run the Mac command again.
+- Flash fails? Hold BOOT, press RST, let go of BOOT, click Flash again.
 
 ## Things you can say
 
@@ -49,4 +48,4 @@ It installs arduino-cli + ESP32 support (first time only), asks your Wi-Fi name 
 - The Nest stays a normal Cast speaker for all other apps. If another app is casting, Jarvis takes over (option 2).
 - When Jarvis answers during its own music, the song continues at the same spot after.
 - Board heard you badly? Raise `MIC_GAIN` in the sketch (4 → 6 or 8).
-- Keep `.env` and `secrets.h` private (they hold your NVIDIA key) — never push them to GitHub.
+- Your NVIDIA key lives only in `.env` on the Pi; your Wi-Fi password only on the board. Neither is in this repo.
