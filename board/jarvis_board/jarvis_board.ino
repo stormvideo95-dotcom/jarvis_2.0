@@ -17,7 +17,7 @@
 #include <Preferences.h>
 #include <ESP_I2S.h>
 
-#define FW_VERSION "1.2"
+#define FW_VERSION "1.3"
 
 // ---- Board pins (ESP32-S3-LCD-1.85 onboard microphone) ----
 #define MIC_BCLK   15
@@ -169,6 +169,7 @@ bool connectWiFi(uint32_t timeoutMs) {
   WiFi.mode(WIFI_STA);
   WiFi.setSleep(false);
   WiFi.begin(cfgSsid.c_str(), cfgPass.c_str());
+  WiFi.setTxPower(WIFI_POWER_19_5dBm);
   uint32_t t = millis();
   while (WiFi.status() != WL_CONNECTED && millis() - t < timeoutMs) { delay(250); Serial.print("."); }
   bool ok = WiFi.status() == WL_CONNECTED;
@@ -225,12 +226,14 @@ void sendToJarvis(size_t pcmBytes) {
     http.begin(cfgUrl + "/api/talk");
     http.addHeader("Content-Type", "audio/wav");
     addBoardHeaders(http);
-    http.setConnectTimeout(4000);
-    http.setTimeout(8000);   // Jarvis answers at once now, the reply plays on the Nest
+    http.setConnectTimeout(12000);  // weak Wi-Fi: give the connection time
+    http.setTimeout(20000);
+    uint32_t t = millis();
     int code = http.POST(wavBuf, HEADER + pcmBytes);
     http.end();
-    if (code == 200) { evlog = ""; note("sent ok"); return; }
-    note("send try " + String(attempt) + " failed: " + String(code) + " " + HTTPClient::errorToString(code));
+    if (code == 200) { evlog = ""; note("sent ok in " + String(millis() - t) + " ms"); return; }
+    note("send try " + String(attempt) + " to " + cfgUrl + " failed after " + String(millis() - t) +
+         " ms: " + String(code) + " " + HTTPClient::errorToString(code) + ", wifi " + String(WiFi.RSSI()) + " dBm");
     WiFi.disconnect();   // fresh connection for the retry
     delay(300);
   }
@@ -241,11 +244,12 @@ void pingJarvis() {
   HTTPClient http;
   http.begin(cfgUrl + "/api/board-ping");
   addBoardHeaders(http);
-  http.setConnectTimeout(3000);
-  http.setTimeout(3000);
+  http.setConnectTimeout(8000);
+  http.setTimeout(8000);
   int code = http.GET();
   http.end();
   if (code == 200) evlog = "";
+  else note("ping " + cfgUrl + " failed: " + String(code) + " " + HTTPClient::errorToString(code));
 }
 
 // ============================================================ main
@@ -266,7 +270,7 @@ void setup() {
     Serial.println("Microphone failed to start");
     while (true) delay(1000);
   }
-  note("started v" FW_VERSION ", wifi " + String(WiFi.RSSI()) + " dBm");
+  note("started v" FW_VERSION ", wifi " + String(WiFi.RSSI()) + " dBm, Jarvis at " + cfgUrl);
   pingJarvis();
   Serial.println("Ready: hold BOOT and talk. (Hold BOOT 10 s for setup.)");
 }
