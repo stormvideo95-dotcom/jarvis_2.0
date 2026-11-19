@@ -108,15 +108,52 @@ def handle_audio(body: bytes) -> dict:
 
 
 # ---- API ------------------------------------------------------------------
+board = {"last_seen": None, "ip": None, "fw": None, "rssi": None, "log": deque(maxlen=30)}
+
+
+def _board_seen(request: Request, fw: str, rssi: str, events: str):
+    board["last_seen"] = time.strftime("%H:%M:%S")
+    board["ip"] = request.client.host if request.client else None
+    board["fw"] = fw or board["fw"]
+    board["rssi"] = rssi or board["rssi"]
+    for ev in filter(None, (events or "").split("|")):
+        board["log"].appendleft(ev[:120])
+
+
+def _talk_background(body: bytes):
+    try:
+        handle_audio(body)
+    except Exception as e:
+        log.exception("talk failed")
+        history.appendleft({"time": time.strftime("%H:%M:%S"), "heard": "",
+                            "said": f"Fout: {type(e).__name__}: {e}"[:200], "action": "error"})
+
+
 @app.post("/api/talk")
-async def talk(request: Request, x_jarvis_key: str = Header(default="")):
+async def talk(request: Request, x_jarvis_key: str = Header(default=""),
+               x_board_fw: str = Header(default=""), x_board_rssi: str = Header(default=""),
+               x_board_log: str = Header(default="")):
+    """Board sends audio; we answer at once and do the slow work in the background."""
     _check_key(x_jarvis_key)
     body = await request.body()
-    try:
-        return await run_in_threadpool(handle_audio, body)
-    except Exception as e:  # keep the board simple: always JSON back
-        log.exception("talk failed")
-        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}")
+    _board_seen(request, x_board_fw, x_board_rssi, x_board_log)
+    board["log"].appendleft(f"{time.strftime('%H:%M:%S')} audio {len(body)} bytes")
+    threading.Thread(target=_talk_background, args=(body,), daemon=True).start()
+    return {"ok": True}
+
+
+@app.get("/api/board-ping")
+def board_ping(request: Request, x_jarvis_key: str = Header(default=""),
+               x_board_fw: str = Header(default=""), x_board_rssi: str = Header(default=""),
+               x_board_log: str = Header(default="")):
+    _check_key(x_jarvis_key)
+    _board_seen(request, x_board_fw, x_board_rssi, x_board_log)
+    return {"ok": True}
+
+
+@app.get("/api/board")
+def board_status():
+    return {**{k: v for k, v in board.items() if k != "log"}, "log": list(board["log"])}
 
 
 class TextIn(BaseModel):

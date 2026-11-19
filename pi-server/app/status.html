@@ -34,6 +34,8 @@
   <div class="pills" id="pills"><span class="pill">laden…</span></div>
   <form id="f"><input id="q" placeholder="Zeg iets tegen Jarvis…" autocomplete="off"><button>Stuur</button></form>
   <div id="list"></div>
+  <h3 style="margin:26px 0 8px;font-size:15px;color:var(--muted);font-weight:500">Board-log</h3>
+  <div id="blog" style="font-family:ui-monospace,monospace;font-size:12px;color:var(--muted);line-height:1.7"></div>
 </main>
 <script>
 const key = () => { try { return localStorage.getItem('jarvisKey') || ''; } catch { return ''; } };
@@ -54,6 +56,10 @@ async function load() {
     `<span class="pill">Model <b>${esc(h.model)}</b></span>` +
     `<span class="pill">Taal <b>${esc(h.language)}</b></span>` +
     `<span class="pill">Speaker <b>${esc(h.nest)}</b></span>`;
+  const b = await api('/api/board');
+  document.getElementById('pills').innerHTML +=
+    `<span class="pill">Board <b>${b.last_seen ? 'gezien ' + esc(b.last_seen) : 'nog niet gezien'}</b>${b.rssi ? ' · wifi ' + esc(b.rssi) + ' dBm' : ''}</span>`;
+  document.getElementById('blog').innerHTML = (b.log || []).slice(0, 8).map(l => `<div>${esc(l)}</div>`).join('') || '<div>Nog geen board-log.</div>';
   const items = await api('/api/history');
   document.getElementById('list').innerHTML = items.length ? items.map(i =>
     `<div class="item"><div class="t">${esc(i.time)}${i.action ? ' · ' + esc(i.action) : ''}</div>

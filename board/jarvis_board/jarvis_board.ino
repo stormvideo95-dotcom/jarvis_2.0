@@ -17,7 +17,7 @@
 #include <Preferences.h>
 #include <ESP_I2S.h>
 
-#define FW_VERSION "1.1"
+#define FW_VERSION "1.2"
 
 // ---- Board pins (ESP32-S3-LCD-1.85 onboard microphone) ----
 #define MIC_BCLK   15
@@ -39,6 +39,22 @@ const size_t HEADER = 44;
 const size_t MAX_PCM = (size_t)SAMPLE_RATE * 2 * MAX_SECONDS;
 
 String cfgSsid, cfgPass, cfgUrl, cfgKey;
+
+// ---- small event log, sent to Jarvis so problems show up on the Jarvis page ----
+String evlog;
+void note(const String &msg) {
+  String line = "up " + String(millis() / 1000) + "s " + msg;
+  Serial.println(line);
+  if (evlog.length() > 600) evlog = evlog.substring(evlog.indexOf('|') + 1);
+  evlog += (evlog.length() ? "|" : "") + line;
+}
+
+void addBoardHeaders(HTTPClient &http) {
+  http.addHeader("X-Jarvis-Key", cfgKey);
+  http.addHeader("X-Board-Fw", FW_VERSION);
+  http.addHeader("X-Board-Rssi", String(WiFi.RSSI()));
+  http.addHeader("X-Board-Log", evlog);
+}
 
 // ============================================================ settings
 void loadSettings() {
@@ -202,17 +218,34 @@ size_t record(bool &wantSetup) {
 }
 
 void sendToJarvis(size_t pcmBytes) {
-  if (!connectWiFi(15000)) return;
   writeWavHeader(wavBuf, pcmBytes);
+  for (int attempt = 1; attempt <= 2; attempt++) {
+    if (!connectWiFi(15000)) { note("send: no wifi"); continue; }
+    HTTPClient http;
+    http.begin(cfgUrl + "/api/talk");
+    http.addHeader("Content-Type", "audio/wav");
+    addBoardHeaders(http);
+    http.setConnectTimeout(4000);
+    http.setTimeout(8000);   // Jarvis answers at once now, the reply plays on the Nest
+    int code = http.POST(wavBuf, HEADER + pcmBytes);
+    http.end();
+    if (code == 200) { evlog = ""; note("sent ok"); return; }
+    note("send try " + String(attempt) + " failed: " + String(code) + " " + HTTPClient::errorToString(code));
+    WiFi.disconnect();   // fresh connection for the retry
+    delay(300);
+  }
+}
+
+void pingJarvis() {
+  if (WiFi.status() != WL_CONNECTED || cfgUrl.isEmpty()) return;
   HTTPClient http;
-  http.begin(cfgUrl + "/api/talk");
-  http.addHeader("Content-Type", "audio/wav");
-  http.addHeader("X-Jarvis-Key", cfgKey);
-  http.setTimeout(30000);
-  Serial.printf("Sending %.1f s to Jarvis...\n", pcmBytes / (SAMPLE_RATE * 2.0));
-  int code = http.POST(wavBuf, HEADER + pcmBytes);
-  Serial.printf("Jarvis answered (%d): %s\n", code, http.getString().c_str());
+  http.begin(cfgUrl + "/api/board-ping");
+  addBoardHeaders(http);
+  http.setConnectTimeout(3000);
+  http.setTimeout(3000);
+  int code = http.GET();
   http.end();
+  if (code == 200) evlog = "";
 }
 
 // ============================================================ main
@@ -233,6 +266,8 @@ void setup() {
     Serial.println("Microphone failed to start");
     while (true) delay(1000);
   }
+  note("started v" FW_VERSION ", wifi " + String(WiFi.RSSI()) + " dBm");
+  pingJarvis();
   Serial.println("Ready: hold BOOT and talk. (Hold BOOT 10 s for setup.)");
 }
 
@@ -241,15 +276,20 @@ void loop() {
     delay(30);
     if (digitalRead(BOOT_BTN) == LOW) {
       bool wantSetup = false;
+      note("BOOT pressed");
       size_t bytes = record(wantSetup);
       if (wantSetup) runSetupPortal();
+      note("recorded " + String(bytes * 1000 / (SAMPLE_RATE * 2)) + " ms");
       if (bytes >= (size_t)SAMPLE_RATE * 2 * MIN_MS / 1000) sendToJarvis(bytes);
-      else Serial.println("Too short, ignored.");
+      else note("too short, ignored");
     }
   }
+  static uint32_t lastPing = 0;
+  if (millis() - lastPing > 30000) { lastPing = millis(); pingJarvis(); }
   static uint32_t lastTry = 0;
   if (WiFi.status() != WL_CONNECTED && millis() - lastTry > 10000) {
     lastTry = millis();
+    note("wifi lost, reconnecting");
     connectWiFi(8000);
   }
   delay(10);
