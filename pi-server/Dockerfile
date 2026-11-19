@@ -13,7 +13,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Wake words (openWakeWord, ONNX engine only) + the 4 ready-made models
 RUN pip install --no-cache-dir --no-deps "openwakeword==0.6.0" \
- && pip install --no-cache-dir scipy tqdm requests \
+ && pip install --no-cache-dir scipy tqdm requests scikit-learn \
  && python -c "from openwakeword import utils; utils.download_models(model_names=['hey_jarvis','alexa','hey_mycroft','hey_rhasspy'])"
 
 # Flemish Piper voice (nathalie). Swap for nl_BE-rdh-medium if you want a male voice.
