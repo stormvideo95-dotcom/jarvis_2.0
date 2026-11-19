@@ -16,7 +16,8 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import brain, config, ha, music, stt, tts
+from . import brain, config, ha, music, settings, stt, tts
+from .wake import WakeListener
 from .nest import Nest
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -110,6 +111,47 @@ def handle_audio(body: bytes) -> dict:
     return handle_text(text)
 
 
+# ---- wake word mode ----------------------------------------------------------
+def _make_ding() -> str:
+    """Short two-tone 'ding' the Nest plays when the wake word is heard."""
+    import math
+    import wave as _w
+    path = AUDIO / "ding.wav"
+    if not path.exists():
+        frames = bytearray()
+        for f, dur in ((880, 0.09), (1320, 0.14)):
+            for i in range(int(16000 * dur)):
+                env = min(1.0, i / 160) * (1 - i / (16000 * dur))
+                v = int(9000 * env * math.sin(2 * math.pi * f * i / 16000))
+                frames += v.to_bytes(2, "little", signed=True)
+        with _w.open(str(path), "wb") as w:
+            w.setnchannels(1); w.setsampwidth(2); w.setframerate(16000); w.writeframes(bytes(frames))
+    return f"{config.PUBLIC_URL}/audio/ding.wav"
+
+
+def _on_wake():
+    try:
+        nest.speak(_make_ding(), 0.25)
+    except Exception:
+        log.exception("ding failed")
+
+
+def _on_wake_command(wav: bytes):
+    _talk_background(wav)
+
+
+wake = WakeListener(_on_wake_command, on_wake=_on_wake,
+                    on_event=lambda msg: board["log"].appendleft(msg))
+
+
+@app.on_event("startup")
+def _start_wake():
+    try:
+        wake.start(config.UDP_PORT)
+    except Exception:
+        log.exception("could not start wake word listener")
+
+
 # ---- announce Jarvis on the network so the board can find it (mDNS) --------
 _zc = None
 
@@ -193,12 +235,27 @@ def board_ping(request: Request, x_jarvis_key: str = Header(default=""),
                x_board_log: str = Header(default="")):
     _check_key(x_jarvis_key)
     _board_seen(request, x_board_fw, x_board_rssi, x_board_log)
-    return {"ok": True}
+    cfg = settings.get()
+    return {"ok": True, "mode": cfg["mode"], "udp": config.UDP_PORT}
 
 
 @app.get("/api/board")
 def board_status():
-    return {**{k: v for k, v in board.items() if k != "log"}, "log": list(board["log"])}
+    return {**{k: v for k, v in board.items() if k != "log"}, "log": list(board["log"]),
+            "wake": wake.status()}
+
+
+@app.get("/api/settings")
+def get_settings():
+    return {**settings.get(), "wake_words": settings.WAKE_WORDS}
+
+
+@app.post("/api/settings")
+async def set_settings(request: Request, x_jarvis_key: str = Header(default="")):
+    _check_key(x_jarvis_key)
+    cfg = settings.update(await request.json())
+    board["log"].appendleft(f"{time.strftime('%H:%M:%S')} settings: {cfg['mode']}, {cfg['wake_word']}")
+    return {**cfg, "wake_words": settings.WAKE_WORDS}
 
 
 class TextIn(BaseModel):

@@ -33,6 +33,19 @@ Then press RST, join the Wi-Fi **Jarvis-Setup** with your phone and fill in your
 - Logs: `docker logs -f jarvis` · Status page: `http://<pi-ip>:8790`
 - Flash fails? Hold BOOT, press RST, let go of BOOT, click Flash again.
 
+## Button or wake word
+
+On the Jarvis page (`http://<pi-ip>:8790`) choose **Knop (BOOT)** or **Wake word**.
+Wake words: **Hey Jarvis, Alexa, Hey Mycroft, Hey Rhasspy** (openWakeWord, runs on the Pi, audio never leaves your home).
+In wake word mode the board streams its mic to the Pi; BOOT keeps working too. A ding on the Nest means "I'm listening".
+
+## Home Assistant
+
+The Pi installer asks once for a Home Assistant long-lived token
+(HA: your name bottom left → Security → Long-lived access tokens). Jarvis can control
+lights, switches, scenes, fans and the thermostat (`HA_DOMAINS` in `.env`) and read temperatures.
+Locks, alarms and garage doors are left out on purpose.
+
 ## Things you can say
 
 | Say | Jarvis does |
@@ -41,6 +54,7 @@ Then press RST, join the Wi-Fi **Jarvis-Setup** with your phone and fill in your
 | "Volgende" / "pauze" / "verder" / "stop" | Controls the music (no talking) |
 | "Zet het volume op 30" | Volume |
 | "Timer van 10 minuten voor de pizza" | Says it when time is up |
+| "Doe de lichten aan" / "Hoe warm is het binnen?" | Home Assistant |
 | Any question | Short spoken answer |
 
 ## Good to know

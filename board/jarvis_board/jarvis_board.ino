@@ -16,9 +16,10 @@
 #include <DNSServer.h>
 #include <Preferences.h>
 #include <ESPmDNS.h>
+#include <WiFiUdp.h>
 #include <ESP_I2S.h>
 
-#define FW_VERSION "1.4"
+#define FW_VERSION "1.5"
 
 // ---- Board pins (ESP32-S3-LCD-1.85 onboard microphone) ----
 #define MIC_BCLK   15
@@ -40,6 +41,22 @@ const size_t HEADER = 44;
 const size_t MAX_PCM = (size_t)SAMPLE_RATE * 2 * MAX_SECONDS;
 
 String cfgSsid, cfgPass, cfgUrl, cfgKey;
+
+// ---- wake word mode: stream the mic to the Pi, which listens for the word ----
+bool wakeMode = false;
+uint16_t udpPort = 8791;
+WiFiUDP udp;
+IPAddress jarvisIP;
+uint8_t streamPkt[16 + 1024];
+
+bool resolveJarvisIP() {
+  int a = cfgUrl.indexOf("://");
+  String host = cfgUrl.substring(a < 0 ? 0 : a + 3);
+  int c = host.indexOf(':'); if (c >= 0) host = host.substring(0, c);
+  int sl = host.indexOf('/'); if (sl >= 0) host = host.substring(0, sl);
+  if (jarvisIP.fromString(host)) return true;
+  return WiFi.hostByName(host.c_str(), jarvisIP) == 1;
+}
 
 // ---- small event log, sent to Jarvis so problems show up on the Jarvis page ----
 String evlog;
@@ -278,9 +295,21 @@ void pingJarvis() {
   http.setConnectTimeout(8000);
   http.setTimeout(8000);
   int code = http.GET();
+  String body = code == 200 ? http.getString() : "";
   http.end();
-  if (code == 200) evlog = "";
-  else note("ping " + cfgUrl + " failed: " + String(code) + " " + HTTPClient::errorToString(code));
+  if (code != 200) {
+    note("ping " + cfgUrl + " failed: " + String(code) + " " + HTTPClient::errorToString(code));
+    return;
+  }
+  evlog = "";
+  bool want = body.indexOf("\"mode\":\"wake\"") >= 0;
+  int u = body.indexOf("\"udp\":");
+  if (u >= 0) udpPort = body.substring(u + 6).toInt();
+  if (want && !resolveJarvisIP()) { note("wake mode: cannot resolve Jarvis IP"); want = false; }
+  if (want != wakeMode) {
+    wakeMode = want;
+    note(wakeMode ? "mode: wake word (streaming to " + jarvisIP.toString() + ":" + String(udpPort) + ")" : "mode: button");
+  }
 }
 
 // ============================================================ main
@@ -320,6 +349,19 @@ void loop() {
       else note("too short, ignored");
     }
   }
+  if (wakeMode && WiFi.status() == WL_CONNECTED && digitalRead(BOOT_BTN) == HIGH) {
+    memset(streamPkt, 0, 16);
+    memcpy(streamPkt, cfgKey.c_str(), min((size_t)16, (size_t)cfgKey.length()));
+    size_t n = mic.readBytes((char *)streamPkt + 16, 1024);
+    int16_t *smp = (int16_t *)(streamPkt + 16);
+    for (size_t i = 0; i < n / 2; i++) {
+      int32_t v = (int32_t)smp[i] * MIC_GAIN;
+      smp[i] = v > 32767 ? 32767 : (v < -32768 ? -32768 : v);
+    }
+    udp.beginPacket(jarvisIP, udpPort);
+    udp.write(streamPkt, 16 + n);
+    udp.endPacket();
+  }
   static uint32_t lastPing = 0;
   if (millis() - lastPing > 30000) { lastPing = millis(); pingJarvis(); }
   static uint32_t lastTry = 0;
@@ -328,5 +370,5 @@ void loop() {
     note("wifi lost, reconnecting");
     connectWiFi(8000);
   }
-  delay(10);
+  if (!wakeMode) delay(10);
 }

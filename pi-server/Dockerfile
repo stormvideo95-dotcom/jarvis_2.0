@@ -11,6 +11,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl unzip ca-c
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Wake words (openWakeWord, ONNX engine only) + the 4 ready-made models
+RUN pip install --no-cache-dir --no-deps "openwakeword==0.6.0" \
+ && pip install --no-cache-dir scipy tqdm requests \
+ && python -c "from openwakeword import utils; utils.download_models(model_names=['hey_jarvis','alexa','hey_mycroft','hey_rhasspy'])"
+
 # Flemish Piper voice (nathalie). Swap for nl_BE-rdh-medium if you want a male voice.
 RUN mkdir -p /voices \
  && curl -fsSL -o /voices/nl_BE-nathalie-medium.onnx \

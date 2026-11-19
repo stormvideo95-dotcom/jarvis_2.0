@@ -20,6 +20,7 @@ NEST_IP = _env("NEST_IP", "")      # optional, faster + more reliable than disco
 
 PUBLIC_URL = _env("PUBLIC_URL", "http://192.168.1.10:8790").rstrip("/")
 PORT = int(_env("PORT", "8790"))
+UDP_PORT = int(_env("UDP_PORT", "8791"))  # board mic stream in wake word mode
 JARVIS_KEY = _env("JARVIS_KEY", "")  # shared secret the board sends
 
 PIPER_VOICE = _env("PIPER_VOICE", "/voices/nl_BE-nathalie-medium.onnx")
