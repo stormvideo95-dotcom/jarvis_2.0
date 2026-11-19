@@ -116,7 +116,7 @@ async def talk(request: Request, x_jarvis_key: str = Header(default="")):
         return await run_in_threadpool(handle_audio, body)
     except Exception as e:  # keep the board simple: always JSON back
         log.exception("talk failed")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}")
 
 
 class TextIn(BaseModel):
@@ -127,12 +127,16 @@ class TextIn(BaseModel):
 async def text(msg: TextIn, x_jarvis_key: str = Header(default="")):
     """Type to Jarvis without the board (handy for testing)."""
     _check_key(x_jarvis_key)
-    return await run_in_threadpool(handle_text, msg.text)
+    try:
+        return await run_in_threadpool(handle_text, msg.text)
+    except Exception as e:
+        log.exception("text failed")
+        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}")
 
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "nvidia_key": bool(config.NVIDIA_API_KEY), "model": config.NVIDIA_MODEL,
+    return {"ok": True, "nvidia_key": bool(config.NVIDIA_API_KEY), "model": brain.current_model(),
             "language": config.LANGUAGE,
             "nest": (lambda s: s["name"] or s["ip"] or "auto")(nest.chosen())}
 
