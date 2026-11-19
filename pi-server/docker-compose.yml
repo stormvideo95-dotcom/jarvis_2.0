@@ -1,0 +1,10 @@
+services:
+  jarvis:
+    build: .
+    container_name: jarvis
+    # host network so the Pi can find and cast to the Nest Mini on your Wi-Fi
+    network_mode: host
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/data   # speaker.json (your chosen speaker) lives here

@@ -1,0 +1,6 @@
+pi-server/.env
+board/jarvis_board/secrets.h
+pi-server/data/*
+!pi-server/data/.keep
+__pycache__/
+*.pyc
