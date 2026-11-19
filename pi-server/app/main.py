@@ -52,7 +52,7 @@ def say(text: str, then=None):
         return
     name = f"{uuid.uuid4().hex}.wav"
     seconds = tts.to_wav(text, str(AUDIO / name))
-    nest.speak(f"{config.PUBLIC_URL}/audio/{name}", seconds, then=then)
+    nest.speak(f"{config.PUBLIC_URL}/audio/{name}", seconds, then=then, text=text)
     _cleanup_audio()
 
 
@@ -217,7 +217,9 @@ def _on_wake_command(wav: bytes):
 
 
 wake = WakeListener(_on_wake_command, on_wake=_on_wake,
-                    on_event=lambda msg: board["log"].appendleft(msg))
+                    on_event=lambda msg: board["log"].appendleft(msg),
+                    talking=lambda: nest.talking(), on_stop=lambda: nest.stop_speaking(),
+                    transcribe=lambda pcm, rate: stt.transcribe(pcm, rate))
 
 
 @app.on_event("startup")

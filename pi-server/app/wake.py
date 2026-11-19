@@ -44,8 +44,14 @@ def to_wav(pcm: bytes) -> bytes:
     return buf.getvalue()
 
 
+STOP_WORDS = ("stop", "zwijg", "hou op", "houd op", "genoeg", "shut up", "be quiet")
+STOP_WINDOW_S = 1.6          # audio checked for "stop" while Jarvis talks
+STOP_EVERY_S = 1.0
+
+
 class WakeListener:
-    def __init__(self, on_command, on_wake=None, on_event=None):
+    def __init__(self, on_command, on_wake=None, on_event=None,
+                 talking=None, on_stop=None, transcribe=None):
         self.on_command = on_command   # called with WAV bytes after the wake word
         self.on_wake = on_wake          # called right when the word is heard (ding)
         self.on_event = on_event or (lambda msg: None)
@@ -61,6 +67,12 @@ class WakeListener:
         self.last_packet = 0.0
         self.last_score = 0.0
         self.key = config.JARVIS_KEY.encode()[:16].ljust(16, b"\0")
+        self.talking = talking          # () -> text Jarvis is saying, or None
+        self.on_stop = on_stop
+        self.transcribe = transcribe
+        self._sbuf = b""
+        self._last_stop_check = 0.0
+        self._stop_busy = False
 
     # ---- model ------------------------------------------------------------
     def _ensure_model(self, word: str):
@@ -76,6 +88,11 @@ class WakeListener:
     def feed(self, pcm: bytes):
         """Feed raw 16 kHz PCM (any length)."""
         self.last_packet = time.time()
+        said = self.talking() if self.talking else None
+        if said is not None and self._state != "recording":
+            self._watch_for_stop(pcm, said)
+            return
+        self._sbuf = b""
         cfg = settings.get()
         if cfg["mode"] != "wake":
             return
@@ -96,6 +113,34 @@ class WakeListener:
             if score >= cfg["sensitivity"]:
                 self._start_recording(score)
                 break
+
+    # ---- "stop" while Jarvis talks --------------------------------------------
+    def _watch_for_stop(self, pcm: bytes, said: str):
+        self._sbuf = (self._sbuf + pcm)[-int(STOP_WINDOW_S * RATE * 2):]
+        now = time.time()
+        if (self._stop_busy or not self.transcribe or now - self._last_stop_check < STOP_EVERY_S
+                or len(self._sbuf) < RATE or _rms(self._sbuf) < SILENCE_RMS):
+            return
+        self._last_stop_check = now
+        self._stop_busy = True
+        window = self._sbuf
+        said_low = (said or "").lower()
+
+        def check():
+            try:
+                heard = (self.transcribe(window, RATE) or "").lower()
+                hit = next((w for w in STOP_WORDS if w in heard and w not in said_low), None)
+                if hit:
+                    log.info("stop heard: %r", heard)
+                    self.on_event(f"{time.strftime('%H:%M:%S')} STOP heard ('{heard[:40]}')")
+                    self._sbuf = b""
+                    if self.on_stop:
+                        self.on_stop()
+            except Exception:
+                log.debug("stop check failed", exc_info=True)
+            finally:
+                self._stop_busy = False
+        threading.Thread(target=check, daemon=True).start()
 
     def _start_recording(self, score: float):
         log.info("wake word heard (score %.2f)", score)

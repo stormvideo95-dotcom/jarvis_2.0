@@ -19,7 +19,7 @@
 #include <WiFiUdp.h>
 #include <ESP_I2S.h>
 
-#define FW_VERSION "1.5"
+#define FW_VERSION "1.6"
 
 // ---- Board pins (ESP32-S3-LCD-1.85 onboard microphone) ----
 #define MIC_BCLK   15
@@ -44,6 +44,7 @@ String cfgSsid, cfgPass, cfgUrl, cfgKey;
 
 // ---- wake word mode: stream the mic to the Pi, which listens for the word ----
 bool wakeMode = false;
+uint32_t streamUntil = 0;   // button mode: keep the mic open while Jarvis answers (for "stop")
 uint16_t udpPort = 8791;
 WiFiUDP udp;
 IPAddress jarvisIP;
@@ -278,7 +279,12 @@ void sendToJarvis(size_t pcmBytes) {
     uint32_t t = millis();
     int code = http.POST(wavBuf, HEADER + pcmBytes);
     http.end();
-    if (code == 200) { evlog = ""; note("sent ok in " + String(millis() - t) + " ms"); return; }
+    if (code == 200) {
+      evlog = "";
+      note("sent ok in " + String(millis() - t) + " ms");
+      if (resolveJarvisIP()) streamUntil = millis() + 30000;  // listen for "stop" while it answers
+      return;
+    }
     note("send try " + String(attempt) + " to " + cfgUrl + " failed after " + String(millis() - t) +
          " ms: " + String(code) + " " + HTTPClient::errorToString(code) + ", wifi " + String(WiFi.RSSI()) + " dBm");
     if (attempt == 1 && discoverJarvis()) continue;  // maybe the Pi moved: retry at the found address
@@ -349,7 +355,8 @@ void loop() {
       else note("too short, ignored");
     }
   }
-  if (wakeMode && WiFi.status() == WL_CONNECTED && digitalRead(BOOT_BTN) == HIGH) {
+  bool streaming = wakeMode || (int32_t)(streamUntil - millis()) > 0;
+  if (streaming && WiFi.status() == WL_CONNECTED && digitalRead(BOOT_BTN) == HIGH) {
     memset(streamPkt, 0, 16);
     memcpy(streamPkt, cfgKey.c_str(), min((size_t)16, (size_t)cfgKey.length()));
     size_t n = mic.readBytes((char *)streamPkt + 16, 1024);
@@ -370,5 +377,5 @@ void loop() {
     note("wifi lost, reconnecting");
     connectWiFi(8000);
   }
-  if (!wakeMode) delay(10);
+  if (!streaming) delay(10);
 }

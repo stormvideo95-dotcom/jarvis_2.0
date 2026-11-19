@@ -17,6 +17,9 @@ class Nest:
         self._target = None
         self._lock = threading.RLock()
         self.music = None  # {"title","url","type"} of the song Jarvis is playing
+        self._interrupt = threading.Event()
+        self.speaking_until = 0.0   # while time < this, Jarvis is talking
+        self.speaking_text = ""
 
     # ---- connection -------------------------------------------------------
     @staticmethod
@@ -77,18 +80,37 @@ class Nest:
         return float(getattr(st, "adjusted_current_time", None) or st.current_time or 0.0)
 
     # ---- public -----------------------------------------------------------
-    def speak(self, url: str, seconds: float, then=None):
+    def speak(self, url: str, seconds: float, then=None, text: str = ""):
         """Cast a reply. Runs in the background so the board gets an answer fast."""
         def run():
             with self._lock:
                 resume_at = self._jarvis_music_position()
+                self._interrupt.clear()
                 self._play(url, "audio/wav", "Jarvis")
-                time.sleep(seconds + 1.5)
+                self.speaking_text = text
+                self.speaking_until = time.time() + seconds + 1.0
+                stopped = self._interrupt.wait(seconds + 1.5)
+                self.speaking_until = 0.0
+                self.speaking_text = ""
+                if stopped:            # "stop!" -> silence, nothing else
+                    return
                 if then is not None:
                     then()
                 elif resume_at is not None:
                     self._play(self.music["url"], self.music["type"], self.music["title"], resume_at)
         threading.Thread(target=run, daemon=True).start()
+
+    def talking(self):
+        """Text Jarvis is saying right now, or None when it is quiet."""
+        return self.speaking_text if time.time() < self.speaking_until else None
+
+    def stop_speaking(self):
+        if time.time() < self.speaking_until:
+            self._interrupt.set()
+            try:
+                self._mc().stop()
+            except Exception:
+                pass
 
     def play_track(self, track: dict, start: float = 0.0):
         with self._lock:

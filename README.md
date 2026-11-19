@@ -46,6 +46,11 @@ The Pi installer asks once for a Home Assistant long-lived token
 lights, switches, scenes, fans and the thermostat (`HA_DOMAINS` in `.env`) and read temperatures.
 Locks, alarms and garage doors are left out on purpose.
 
+## Say "stop"
+
+While Jarvis is talking you can say **stop** (or stoppen, zwijg, hou op, genoeg) and it goes quiet right away.
+In button mode the board keeps the mic open for 30 s after you talk, so it hears you.
+
 ## Music AI (phone ↔ Nest ↔ Mac)
 
 Jarvis joins your Music AI taste server (`MUSIC_AI_URL`, default `http://127.0.0.1:8765`) as the device **Jarvis (Nest)**.
