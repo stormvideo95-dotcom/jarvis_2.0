@@ -1,5 +1,6 @@
 """The thinking part: NVIDIA cloud LLM that answers and picks an action."""
 import json
+import os
 import re
 import time
 from collections import deque
@@ -45,39 +46,64 @@ def _llm():
 def parse_reply(raw: str) -> dict:
     """Turn model output into {"say": str, "action": dict|None}. Never raises."""
     raw = (raw or "").strip()
-    match = re.search(r"\{.*\}", raw, re.S)
-    if match:
+    candidates = re.findall(r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)?\}", raw, re.S)
+    for chunk in reversed(candidates):
+        if '"say"' not in chunk:
+            continue
         try:
-            data = json.loads(match.group(0))
+            data = json.loads(chunk)
             say = str(data.get("say") or "").strip()
             action = data.get("action")
             if not (isinstance(action, dict) and action.get("type") in ACTIONS):
                 action = None
             return {"say": say, "action": action}
         except (json.JSONDecodeError, AttributeError):
-            pass
-    # Model ignored the format: speak the plain text.
-    return {"say": raw[:400], "action": None}
+            continue
+    # Model ignored the format: speak short plain text, never long reasoning.
+    if raw and len(raw) <= 300 and "<think>" not in raw:
+        return {"say": raw, "action": None}
+    return {"say": "", "action": None}
 
 
 # Tried in this order when the configured model is gone (NVIDIA removes old models).
 PREFERRED_MODELS = [
+    "nvidia/nemotron-3.5-lightning-30b-a3b",
     "google/gemma-4-31b-it",
     "mistralai/mistral-large-4-1t-a52b",
     "z-ai/glm-5.3-flash",
     "minimaxai/minimax-m3.1-flash",
-    "nvidia/nemotron-3.5-lightning-30b-a3b",
     "moonshotai/kimi-k3.1-pro",
     "google/gemma-3-12b-it",
     "meta/llama-4-maverick-17b-128e-instruct",
     "nvidia/llama-3.3-nemotron-super-49b-v1.5",
 ]
 _SKIP = ("translate", "detector", "pii", "calibration", "omni", "embed", "rerank", "guard", "safety", "vision", "-vl", "coder", "reward", "parse", "retriev", "clip")
-_model = None  # model actually in use
+MODEL_FILE = os.path.join(os.path.dirname(config.SPEAKER_FILE), "model.txt")
+
+
+def _saved_model():
+    try:
+        with open(MODEL_FILE, encoding="utf-8") as f:
+            return f.read().strip() or None
+    except OSError:
+        return None
+
+
+_model = _saved_model()  # model that last worked (survives restarts)
 
 
 def current_model() -> str:
     return _model or config.NVIDIA_MODEL
+
+
+def _remember(model: str):
+    global _model
+    _model = model
+    try:
+        with open(MODEL_FILE, "w", encoding="utf-8") as f:
+            f.write(model)
+    except OSError:
+        pass
 
 
 _available: list[str] | None = None
@@ -98,21 +124,46 @@ def _candidates() -> list[str]:
     return order[:5]
 
 
+def _no_think(model: str, messages: list) -> tuple[list, dict]:
+    """Ask reasoning models (Nemotron, Qwen...) to answer straight away."""
+    extra = {"chat_template_kwargs": {"enable_thinking": False, "thinking": False}}
+    if "nemotron" in model or "qwen" in model:
+        msgs = [dict(messages[0], content="/no_think\n" + messages[0]["content"]), *messages[1:]]
+        return msgs, extra
+    return messages, {}
+
+
+def _text_of(msg) -> str:
+    content = (msg.content or "").strip()
+    if content:
+        return content
+    # some models put everything in a separate reasoning field
+    for field in ("reasoning_content", "reasoning"):
+        val = getattr(msg, field, None) or (getattr(msg, "model_extra", None) or {}).get(field)
+        if val:
+            return str(val)
+    return ""
+
+
 def _chat(messages: list) -> str:
     """Try models until one answers within 15 s; remember the one that worked."""
-    global _model
     last = None
     for model in _candidates():
         t = time.time()
+        msgs, extra = _no_think(model, messages)
         try:
             resp = _llm().chat.completions.create(
-                model=model, messages=messages, temperature=0.4, max_tokens=400)
-            if model != current_model():
+                model=model, messages=msgs, temperature=0.4, max_tokens=600,
+                **({"extra_body": extra} if extra else {}))
+            text = _text_of(resp.choices[0].message)
+            if not text:
+                raise RuntimeError("empty answer")
+            if model != current_model() or _saved_model() != model:
                 print(f"[jarvis] now using model {model}", flush=True)
-                _model = model
+                _remember(model)
             print(f"[jarvis] {model} answered in {time.time() - t:.1f}s", flush=True)
-            return resp.choices[0].message.content or ""
-        except Exception as e:  # timeout, gone, overloaded... try the next one
+            return text
+        except Exception as e:  # timeout, gone, overloaded, empty... try the next one
             print(f"[jarvis] {model} failed after {time.time() - t:.1f}s: {type(e).__name__} {e}"[:300], flush=True)
             last = e
     raise RuntimeError(f"no NVIDIA model answered: {last}")
@@ -124,6 +175,8 @@ def ask(text: str) -> dict:
     raw = _chat(messages)
     raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.S)  # reasoning models
     reply = parse_reply(raw)
+    if not reply["say"] and not reply["action"]:
+        reply["say"] = "Sorry, daar heb ik even geen antwoord op."
     _history.append({"role": "user", "content": text})
     _history.append({"role": "assistant", "content": json.dumps(reply, ensure_ascii=False)})
     return reply

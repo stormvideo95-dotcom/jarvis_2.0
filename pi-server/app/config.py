@@ -8,7 +8,7 @@ def _env(name: str, default: str = "") -> str:
 
 NVIDIA_API_KEY = _env("NVIDIA_API_KEY")
 NVIDIA_BASE_URL = _env("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1")
-NVIDIA_MODEL = _env("NVIDIA_MODEL", "google/gemma-4-31b-it")
+NVIDIA_MODEL = _env("NVIDIA_MODEL", "nvidia/nemotron-3.5-lightning-30b-a3b")
 
 # Whisper large v3 on build.nvidia.com (Riva gRPC)
 STT_SERVER = _env("STT_SERVER", "grpc.nvcf.nvidia.com:443")

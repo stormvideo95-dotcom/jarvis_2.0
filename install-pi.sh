@@ -42,9 +42,10 @@ else
     ok "Moved Jarvis to port 8790"
   fi
   # old default model was removed by NVIDIA
-  if grep -q '^NVIDIA_MODEL=meta/llama-3.3-70b-instruct' .env; then
-    sed -i 's#^NVIDIA_MODEL=.*#NVIDIA_MODEL=google/gemma-4-31b-it#' .env
-    ok "Switched AI model to google/gemma-4-31b-it"
+  if grep -Eq '^NVIDIA_MODEL=(meta/llama-3.3-70b-instruct|google/gemma-4-31b-it)$' .env; then
+    sed -i 's#^NVIDIA_MODEL=.*#NVIDIA_MODEL=nvidia/nemotron-3.5-lightning-30b-a3b#' .env
+    rm -f data/model.txt
+    ok "Switched AI model to nvidia/nemotron-3.5-lightning-30b-a3b (fastest on NVIDIA right now)"
   fi
 fi
 PORT=$(grep '^PORT=' .env | cut -d= -f2-); PORT=${PORT:-8790}
