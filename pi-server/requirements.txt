@@ -5,3 +5,4 @@ nvidia-riva-client>=2.17
 pychromecast>=14
 piper-tts>=1.2
 yt-dlp[default]
+zeroconf>=0.130

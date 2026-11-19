@@ -15,9 +15,10 @@
 #include <WebServer.h>
 #include <DNSServer.h>
 #include <Preferences.h>
+#include <ESPmDNS.h>
 #include <ESP_I2S.h>
 
-#define FW_VERSION "1.3"
+#define FW_VERSION "1.4"
 
 // ---- Board pins (ESP32-S3-LCD-1.85 onboard microphone) ----
 #define MIC_BCLK   15
@@ -56,6 +57,34 @@ void addBoardHeaders(HTTPClient &http) {
   http.addHeader("X-Board-Log", evlog);
 }
 
+void saveUrl(const String &u) {
+  prefs.begin("jarvis", false);
+  prefs.putString("url", u);
+  prefs.end();
+  cfgUrl = u;
+}
+
+// Find the Jarvis server on the network (the Pi announces itself as _jarvis._tcp).
+bool discoverJarvis() {
+  static bool mdnsStarted = false;
+  if (!mdnsStarted) mdnsStarted = MDNS.begin("jarvis-board");
+  for (int round = 0; round < 3; round++) {
+    int n = MDNS.queryService("jarvis", "tcp");
+    if (n > 0) {
+      String u = "http://" + MDNS.address(0).toString() + ":" + String(MDNS.port(0));
+      if (u != cfgUrl) { note("found Jarvis at " + u); saveUrl(u); }
+      return true;
+    }
+    delay(500);
+  }
+  note("could not find Jarvis on the network");
+  return false;
+}
+
+bool isExampleUrl(const String &u) {
+  return u.isEmpty() || u.indexOf("192.168.1.10:") >= 0;
+}
+
 // ============================================================ settings
 void loadSettings() {
   prefs.begin("jarvis", true);
@@ -86,7 +115,7 @@ String htmlEscape(const String &in) {
 }
 
 String setupPage(const String &options) {
-  String url = cfgUrl.length() ? cfgUrl : "http://192.168.1.10:8790";
+  String url = isExampleUrl(cfgUrl) ? "" : cfgUrl;
   String h = F("<!doctype html><html><head><meta charset='utf-8'>"
     "<meta name='viewport' content='width=device-width,initial-scale=1'><title>Jarvis setup</title>"
     "<style>body{margin:0;font-family:system-ui,sans-serif;background:#0b0d12;color:#e8ebf2}"
@@ -105,9 +134,10 @@ String setupPage(const String &options) {
   h += F("</select><label>...or type the name</label><input id='s' name='ssid' value='");
   h += htmlEscape(cfgSsid);
   h += F("' required><label>Wi-Fi password</label><input name='pass' type='password'>"
-         "<label>Jarvis on the Pi</label><input name='url' value='");
+         "<label>Jarvis on the Pi (leave empty: found automatically)</label>"
+         "<input name='url' placeholder='automatic' value='");
   h += htmlEscape(url);
-  h += F("' required><label>Jarvis key</label><input name='key' value='");
+  h += F("'><label>Jarvis key</label><input name='key' value='");
   h += htmlEscape(cfgKey);
   h += F("' required><small>The Pi install shows the address and key at the end.</small>"
          "<button>Save and connect</button></form></main></body></html>");
@@ -138,7 +168,7 @@ void runSetupPortal() {
     String s = server.arg("ssid"); s.trim();
     String u = server.arg("url");  u.trim();
     while (u.endsWith("/")) u.remove(u.length() - 1);
-    if (!u.startsWith("http")) u = "http://" + u;
+    if (u.length() && !u.startsWith("http")) u = "http://" + u;
     String k = server.arg("key");  k.trim();
     saveSettings(s, server.arg("pass"), u, k);
     server.send(200, "text/html",
@@ -234,6 +264,7 @@ void sendToJarvis(size_t pcmBytes) {
     if (code == 200) { evlog = ""; note("sent ok in " + String(millis() - t) + " ms"); return; }
     note("send try " + String(attempt) + " to " + cfgUrl + " failed after " + String(millis() - t) +
          " ms: " + String(code) + " " + HTTPClient::errorToString(code) + ", wifi " + String(WiFi.RSSI()) + " dBm");
+    if (attempt == 1 && discoverJarvis()) continue;  // maybe the Pi moved: retry at the found address
     WiFi.disconnect();   // fresh connection for the retry
     delay(300);
   }
@@ -260,7 +291,8 @@ void setup() {
   pinMode(BOOT_BTN, INPUT_PULLUP);
   loadSettings();
 
-  if (cfgSsid.isEmpty() || cfgUrl.isEmpty() || !connectWiFi(30000)) runSetupPortal();
+  if (cfgSsid.isEmpty() || !connectWiFi(30000)) runSetupPortal();
+  if (isExampleUrl(cfgUrl) || cfgKey.isEmpty()) discoverJarvis();
 
   wavBuf = (uint8_t *)ps_malloc(HEADER + MAX_PCM);
   if (!wavBuf) { Serial.println("No PSRAM found!"); while (true) delay(1000); }

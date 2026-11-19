@@ -107,6 +107,48 @@ def handle_audio(body: bytes) -> dict:
     return handle_text(text)
 
 
+# ---- announce Jarvis on the network so the board can find it (mDNS) --------
+_zc = None
+
+
+@app.on_event("startup")
+def _announce_in_background():
+    # zeroconf's blocking API must not run inside the server's event loop
+    threading.Thread(target=announce, daemon=True).start()
+
+
+def announce():
+    global _zc
+    try:
+        import socket
+        from urllib.parse import urlparse
+        from zeroconf import ServiceInfo, Zeroconf
+
+        host = urlparse(config.PUBLIC_URL).hostname
+        info = ServiceInfo(
+            "_jarvis._tcp.local.", "Jarvis._jarvis._tcp.local.",
+            addresses=[socket.inet_aton(host)], port=config.PORT,
+            properties={"v": "1"}, server="jarvis-pi.local.")
+        _zc = Zeroconf()
+        _zc.register_service(info, allow_name_change=True)
+        log.info("announced Jarvis on the network at %s:%s", host, config.PORT)
+    except Exception:
+        log.exception("could not announce Jarvis via mDNS (board must use a fixed address)")
+
+
+@app.on_event("shutdown")
+def _unannounce_in_background():
+    t = threading.Thread(target=unannounce, daemon=True)
+    t.start()
+    t.join(timeout=3)
+
+
+def unannounce():
+    if _zc:
+        _zc.unregister_all_services()
+        _zc.close()
+
+
 # ---- API ------------------------------------------------------------------
 board = {"last_seen": None, "ip": None, "fw": None, "rssi": None, "log": deque(maxlen=30)}
 
