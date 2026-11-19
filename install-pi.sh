@@ -41,6 +41,11 @@ else
     sed -i 's#^PORT=8765#PORT=8790#; s#:8765#:8790#g' .env
     ok "Moved Jarvis to port 8790"
   fi
+  # old default model was removed by NVIDIA
+  if grep -q '^NVIDIA_MODEL=meta/llama-3.3-70b-instruct' .env; then
+    sed -i 's#^NVIDIA_MODEL=.*#NVIDIA_MODEL=google/gemma-4-31b-it#' .env
+    ok "Switched AI model to google/gemma-4-31b-it"
+  fi
 fi
 PORT=$(grep '^PORT=' .env | cut -d= -f2-); PORT=${PORT:-8790}
 if command -v ss >/dev/null && ss -ltn | grep -q ":$PORT " && ! $DOCKER ps --format '{{.Names}}' | grep -qx jarvis; then

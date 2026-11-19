@@ -60,16 +60,17 @@ def parse_reply(raw: str) -> dict:
 
 # Tried in this order when the configured model is gone (NVIDIA removes old models).
 PREFERRED_MODELS = [
+    "google/gemma-4-31b-it",
+    "mistralai/mistral-large-4-1t-a52b",
+    "z-ai/glm-5.3-flash",
+    "minimaxai/minimax-m3.1-flash",
+    "nvidia/nemotron-3.5-lightning-30b-a3b",
+    "moonshotai/kimi-k3.1-pro",
+    "google/gemma-3-12b-it",
     "meta/llama-4-maverick-17b-128e-instruct",
     "nvidia/llama-3.3-nemotron-super-49b-v1.5",
-    "nvidia/llama-3.3-nemotron-super-49b-v1",
-    "qwen/qwen3-next-80b-a3b-instruct",
-    "mistralai/mistral-medium-3-instruct",
-    "mistralai/mistral-small-3.1-24b-instruct-2503",
-    "meta/llama-3.1-70b-instruct",
-    "meta/llama-3.1-8b-instruct",
 ]
-_SKIP = ("embed", "rerank", "guard", "safety", "vision", "-vl", "coder", "reward", "parse", "retriev", "clip")
+_SKIP = ("translate", "detector", "pii", "calibration", "omni", "embed", "rerank", "guard", "safety", "vision", "-vl", "coder", "reward", "parse", "retriev", "clip")
 _model = None  # model actually in use
 
 
@@ -86,7 +87,7 @@ def _pick_model(failed: str) -> str | None:
     for m in PREFERRED_MODELS:
         if m in ids and m != failed:
             return m
-    chat = sorted(i for i in ids if "instruct" in i and not any(s in i for s in _SKIP) and i != failed)
+    chat = sorted(i for i in ids if ("instruct" in i or i.endswith("-it")) and not any(s in i for s in _SKIP) and i != failed)
     return chat[0] if chat else None
 
 
