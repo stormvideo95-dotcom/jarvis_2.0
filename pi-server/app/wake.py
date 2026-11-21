@@ -24,6 +24,7 @@ END_SILENCE_S = 0.9          # stop recording after this much silence
 MAX_RECORD_S = 8.0
 NO_SPEECH_GIVE_UP_S = 4.0    # heard the word but nothing after it
 COOLDOWN_S = 2.5
+ANSWER_GIVE_UP_S = 9.0       # study mode: how long to wait for your answer
 
 
 def _rms(pcm: bytes) -> float:
@@ -51,7 +52,7 @@ STOP_EVERY_S = 1.0
 
 class WakeListener:
     def __init__(self, on_command, on_wake=None, on_event=None,
-                 talking=None, on_stop=None, transcribe=None):
+                 talking=None, on_stop=None, transcribe=None, expect=None, on_silence=None):
         self.on_command = on_command   # called with WAV bytes after the wake word
         self.on_wake = on_wake          # called right when the word is heard (ding)
         self.on_event = on_event or (lambda msg: None)
@@ -73,6 +74,9 @@ class WakeListener:
         self._sbuf = b""
         self._last_stop_check = 0.0
         self._stop_busy = False
+        self.expect = expect            # threading.Event: Jarvis asked something, record the answer
+        self.on_silence = on_silence    # called when no answer came
+        self._answer_mode = False
 
     # ---- model ------------------------------------------------------------
     def _ensure_model(self, word: str):
@@ -93,11 +97,16 @@ class WakeListener:
             self._watch_for_stop(pcm, said)
             return
         self._sbuf = b""
-        cfg = settings.get()
-        if cfg["mode"] != "wake":
-            return
         if self._state == "recording":
             self._record(pcm)
+            return
+        if self._state == "idle" and self.expect is not None and self.expect.is_set():
+            self.expect.clear()
+            self._start_answer()
+            self._record(pcm)
+            return
+        cfg = settings.get()
+        if cfg["mode"] != "wake":
             return
         if self._state == "busy" or time.time() < self._cooldown_until:
             return
@@ -140,7 +149,20 @@ class WakeListener:
                 log.debug("stop check failed", exc_info=True)
             finally:
                 self._stop_busy = False
+        self.expect = expect            # threading.Event: Jarvis asked something, record the answer
+        self.on_silence = on_silence    # called when no answer came
+        self._answer_mode = False
         threading.Thread(target=check, daemon=True).start()
+
+    def _start_answer(self):
+        """Jarvis asked a question (study mode): record the reply without a wake word."""
+        self.on_event(f"{time.strftime('%H:%M:%S')} listening for your answer")
+        self._state = "recording"
+        self._answer_mode = True
+        self._rec = b""
+        self._buf = b""
+        self._rec_start = self._last_voice = time.time()
+        self._heard_voice = False
 
     def _start_recording(self, score: float):
         log.info("wake word heard (score %.2f)", score)
@@ -150,6 +172,7 @@ class WakeListener:
         self._buf = b""
         self._rec_start = self._last_voice = time.time()
         self._heard_voice = False
+        self._answer_mode = False
         try:
             self._model.reset()
         except Exception:
@@ -165,9 +188,13 @@ class WakeListener:
             self._heard_voice = True
         took = now - self._rec_start
         done = (self._heard_voice and now - self._last_voice > END_SILENCE_S) or took > MAX_RECORD_S
-        if not self._heard_voice and took > NO_SPEECH_GIVE_UP_S:
-            self.on_event(f"{time.strftime('%H:%M:%S')} no question after the wake word")
+        give_up = ANSWER_GIVE_UP_S if self._answer_mode else NO_SPEECH_GIVE_UP_S
+        if not self._heard_voice and took > give_up:
+            was_answer = self._answer_mode
+            self.on_event(f"{time.strftime('%H:%M:%S')} " + ("no answer heard" if was_answer else "no question after the wake word"))
             self._finish()
+            if was_answer and self.on_silence:
+                threading.Thread(target=self.on_silence, daemon=True).start()
             return
         if done:
             audio = self._rec
@@ -182,6 +209,7 @@ class WakeListener:
             threading.Thread(target=work, daemon=True).start()
 
     def _finish(self):
+        self._answer_mode = False
         self._rec = b""
         self._buf = b""
         self._state = "idle"

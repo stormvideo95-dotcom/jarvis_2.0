@@ -16,7 +16,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import brain, config, ha, music, musicsync, settings, stt, tts
+from . import brain, config, ha, music, musicsync, settings, study, stt, tts
 from .wake import WakeListener
 from .nest import Nest
 
@@ -62,6 +62,32 @@ def _play_query(query: str):
         nest.play_track(track)
     else:
         say("Ik vond daar geen muziek voor.")
+
+
+# ---- study mode -----------------------------------------------------------
+study_wait = threading.Event()   # set when Jarvis finished asking and waits for your answer
+
+
+def study_say(text: str):
+    """Say something in study mode; afterwards listen for the answer by itself."""
+    study_wait.clear()
+    if study.session.active:
+        say(text, then=study_wait.set)
+    else:
+        say(text)
+
+
+def _study_silence():
+    if study.session.active:
+        study_say(study.session.silence())
+
+
+def _study_stopped_by_voice():
+    nest.stop_speaking()
+    if study.session.active:
+        study_wait.clear()
+        time.sleep(0.6)
+        say(study.session.stop())
 
 
 def _play_tracks(tracks: list, start_ms: int = 0):
@@ -129,6 +155,12 @@ def _skip():
 
 
 def handle_text(text: str) -> dict:
+    if study.session.active:
+        answer = study.session.handle(text)
+        study_say(answer)
+        entry = {"time": time.strftime("%H:%M:%S"), "heard": text, "said": answer, "action": "study"}
+        history.appendleft(entry)
+        return entry
     reply = brain.ask(text, ha.prompt_block() + musicsync.prompt_block())
     action = reply["action"] or {}
     kind = action.get("type")
@@ -140,6 +172,8 @@ def handle_text(text: str) -> dict:
     elif kind == "home":
         problem = ha.run(action) if ha.enabled() else "Home Assistant is nog niet gekoppeld."
         say(problem or reply["say"])
+    elif kind == "study_start":
+        study_say(study.session.start(action.get("subject") or ""))
     elif kind == "music_from":
         tracks, start_ms, dev = musicsync.take_from(action.get("device", ""))
         if not dev:
@@ -181,6 +215,9 @@ def handle_audio(body: bytes) -> dict:
     if len(pcm) < rate * 2 * 0.3:  # under 0.3 s: button tap, ignore
         return {"heard": "", "said": "", "action": None}
     text = stt.transcribe(pcm, rate)
+    if not text and study.session.active:
+        study_say("Ik verstond je niet. Zeg het nog eens?")
+        return {"heard": "", "said": "Ik verstond je niet.", "action": "study"}
     if not text:
         say("Sorry, ik verstond je niet.")
         return {"heard": "", "said": "Sorry, ik verstond je niet.", "action": None}
@@ -218,8 +255,9 @@ def _on_wake_command(wav: bytes):
 
 wake = WakeListener(_on_wake_command, on_wake=_on_wake,
                     on_event=lambda msg: board["log"].appendleft(msg),
-                    talking=lambda: nest.talking(), on_stop=lambda: nest.stop_speaking(),
-                    transcribe=lambda pcm, rate: stt.transcribe(pcm, rate))
+                    talking=lambda: nest.talking(), on_stop=_study_stopped_by_voice,
+                    transcribe=lambda pcm, rate: stt.transcribe(pcm, rate),
+                    expect=study_wait, on_silence=_study_silence)
 
 
 @app.on_event("startup")
@@ -314,7 +352,8 @@ def board_ping(request: Request, x_jarvis_key: str = Header(default=""),
     _check_key(x_jarvis_key)
     _board_seen(request, x_board_fw, x_board_rssi, x_board_log)
     cfg = settings.get()
-    return {"ok": True, "mode": cfg["mode"], "udp": config.UDP_PORT}
+    mode = "wake" if (cfg["mode"] == "wake" or study.session.active) else "button"
+    return {"ok": True, "mode": mode, "udp": config.UDP_PORT}
 
 
 @app.get("/api/board")
@@ -357,6 +396,9 @@ def health():
             "language": config.LANGUAGE,
             "home_assistant": ("verbonden" if ha.ping() else "fout") if ha.enabled() else "niet gekoppeld",
             "music_ai": musicsync.status(),
+            "study": ({"subject": study.session.label(), "game": study.session.game, "n": study.session.n,
+                       "correct": study.session.correct, "points": study.session.points}
+                      if study.session.active else None),
             "nest": (lambda s: s["name"] or s["ip"] or "auto")(nest.chosen())}
 
 

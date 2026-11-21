@@ -15,6 +15,7 @@ Geef ALTIJD alleen één JSON-object terug, niets anders:
 {"say": "<wat je hardop zegt>", "action": <null of een actie>}
 
 Mogelijke acties:
+{"type": "study_start", "subject": "<vak als genoemd, anders leeg>"}   (bij "start studiemodus", "activeer study mode", "ik wil studeren"...)
 {"type": "play_music", "query": "<zoekterm voor YouTube, bv. 'phonk mix'>"}
 {"type": "pause"}   {"type": "resume"}   {"type": "skip"}   {"type": "stop"}
 {"type": "volume", "level": <0-100>}
@@ -27,7 +28,7 @@ Voorbeelden:
 "hoe ver is de maan" -> {"say": "Gemiddeld zo'n 384.000 kilometer.", "action": null}
 """
 
-ACTIONS = {"home", "music_from", "music_to", "play_music", "pause", "resume", "skip", "stop", "volume", "timer"}
+ACTIONS = {"study_start", "home", "music_from", "music_to", "play_music", "pause", "resume", "skip", "stop", "volume", "timer"}
 
 _history: deque = deque(maxlen=8)  # last 4 exchanges
 _client = None
@@ -145,7 +146,7 @@ def _text_of(msg) -> str:
     return ""
 
 
-def _chat(messages: list) -> str:
+def _chat(messages: list, max_tokens: int = 600, temperature: float = 0.4) -> str:
     """Try models until one answers within 15 s; remember the one that worked."""
     last = None
     for model in _candidates():
@@ -153,7 +154,7 @@ def _chat(messages: list) -> str:
         msgs, extra = _no_think(model, messages)
         try:
             resp = _llm().chat.completions.create(
-                model=model, messages=msgs, temperature=0.4, max_tokens=600,
+                model=model, messages=msgs, temperature=temperature, max_tokens=max_tokens,
                 **({"extra_body": extra} if extra else {}))
             text = _text_of(resp.choices[0].message)
             if not text:

@@ -46,6 +46,13 @@ The Pi installer asks once for a Home Assistant long-lived token
 lights, switches, scenes, fans and the thermostat (`HA_DOMAINS` in `.env`) and read temperatures.
 Locks, alarms and garage doors are left out on purpose.
 
+## Study mode
+
+Say **"Jarvis, start studiemodus"**. Jarvis asks: what to study (**NW, HB, Frans**), which game
+(**quiz kahoot** = A-D with points, **quiz type** = open questions, **quiz mix** = everything mixed)
+and how many questions (a number, or "tot ik stop zeg"). Questions come from your own study material
+in `pi-server/app/leerstof/` (from Storm Study). Jarvis listens by itself after every question; say **stop** to end.
+
 ## Say "stop"
 
 While Jarvis is talking you can say **stop** (or stoppen, zwijg, hou op, genoeg) and it goes quiet right away.
