@@ -42,6 +42,15 @@
   <p class="sub">Hou BOOT op je ronde board ingedrukt en praat. Of typ hieronder.</p>
   <div class="pills" id="pills"><span class="pill">laden…</span></div>
   <div class="card" id="musiccode" style="display:none"></div>
+  <div class="card" id="guardcard">
+    <h2>TimeGuard · social media</h2>
+    <div style="height:10px;background:#0f1219;border-radius:99px;overflow:hidden"><span id="gbar" style="display:block;height:100%;width:0;background:var(--accent)"></span></div>
+    <p class="hint" id="gtext">…</p>
+    <div class="row">Daglimiet <input id="glimit" type="range" min="15" max="300" step="15"><span id="glimitv"></span></div>
+    <div class="row"><button type="button" id="glock" style="padding:10px 14px">Alles op slot</button>
+      <button type="button" id="gonoff" style="padding:10px 14px;background:#262c3b;color:var(--text)">TimeGuard uit</button></div>
+    <p class="hint">Openen gaat alleen via Jarvis: "Jarvis, unlock WhatsApp 15 minuten".</p>
+  </div>
   <div class="card">
     <h2>Hoe start je Jarvis?</h2>
     <div class="seg"><button id="m-button" type="button">Knop (BOOT)</button><button id="m-wake" type="button">Wake word</button></div>
@@ -83,6 +92,19 @@ async function load() {
   const ss = h.storm_study || {};
   document.getElementById('pills').innerHTML += `<span class="pill">Storm Study <b>${!ss.linked ? 'niet gekoppeld' :
      (ss.topics ? ss.topics + ' onderwerpen · ' + ss.mistakes + ' fouten' + (ss.points != null ? ' · ' + ss.points + ' pt' : '') : 'zeg "update study mode"')}${ss.queued ? ' · ' + ss.queued + ' in wachtrij' : ''}</b></span>`;
+  const g = h.guard || {};
+  if (g.limit_min !== undefined) {
+    document.getElementById('gbar').style.width = Math.max(0, 100 * g.remaining_min / Math.max(1, g.limit_min)) + '%';
+    const open = Object.entries(g.grants || {}).map(([a, u]) => `${a} ${Math.max(0, Math.round((u - g.now) / 60))} min`);
+    const dev = Object.entries(g.devices || {}).map(([d, s]) => `${d} ${s < 90 ? '✓' : 'offline'}`);
+    document.getElementById('gtext').textContent = g.enabled
+      ? `Nog ${Math.round(g.remaining_min)} van ${g.limit_min} min · open: ${open.join(', ') || 'niets'} · toestellen: ${dev.join(', ') || 'nog geen'}`
+      : 'TimeGuard staat uit: alles is open.';
+    if (document.activeElement !== document.getElementById('glimit')) document.getElementById('glimit').value = g.limit_min;
+    document.getElementById('glimitv').textContent = g.limit_min + ' min';
+    document.getElementById('gonoff').textContent = g.enabled ? 'TimeGuard uit' : 'TimeGuard aan';
+    document.getElementById('gonoff').dataset.on = g.enabled ? '1' : '';
+  }
   const mc = document.getElementById('musiccode');
   if (h.music_ai.code && !h.music_ai.paired) {
     mc.style.display = '';
@@ -139,6 +161,10 @@ async function wakeHint() {
     ? `Board luistert. Zeg "${S.wake_words[S.wake_word]}" en dan je vraag. (laatste score ${w.score})`
     : 'Wacht op het board… (het schakelt binnen 30 seconden om, of druk op RST)';
 }
+document.getElementById('glimit').onchange = e => api('/api/guard/settings', { method: 'POST', body: JSON.stringify({ limit_min: Number(e.target.value) }) }).then(load);
+document.getElementById('glimit').oninput = e => { document.getElementById('glimitv').textContent = e.target.value + ' min'; };
+document.getElementById('glock').onclick = () => api('/api/guard/lock', { method: 'POST' }).then(load);
+document.getElementById('gonoff').onclick = e => api('/api/guard/settings', { method: 'POST', body: JSON.stringify({ enabled: !e.target.dataset.on }) }).then(load);
 loadSettings(); load(); setInterval(() => { load(); wakeHint(); }, 4000);
 </script>
 </body>

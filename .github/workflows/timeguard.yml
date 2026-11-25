@@ -1,0 +1,61 @@
+name: TimeGuard apps
+
+on:
+  push:
+    paths: ["timeguard-android/**", "timeguard-mac/**", ".github/workflows/timeguard.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17" }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: "8.9" }
+      - name: Build APK
+        working-directory: timeguard-android
+        run: gradle :app:assembleDebug --no-daemon --stacktrace
+      - run: cp timeguard-android/app/build/outputs/apk/debug/app-debug.apk TimeGuard.apk
+      - uses: actions/upload-artifact@v4
+        with: { name: TimeGuard-apk, path: TimeGuard.apk }
+
+  mac:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build TimeGuard.app (universal)
+        working-directory: timeguard-mac
+        run: |
+          set -e
+          swiftc -O -target arm64-apple-macos12 -o tg-arm main.swift -framework AppKit -framework ServiceManagement
+          swiftc -O -target x86_64-apple-macos12 -o tg-x86 main.swift -framework AppKit -framework ServiceManagement
+          mkdir -p TimeGuard.app/Contents/MacOS
+          lipo -create tg-arm tg-x86 -output TimeGuard.app/Contents/MacOS/TimeGuard
+          cp Info.plist TimeGuard.app/Contents/Info.plist
+          codesign --force --deep -s - TimeGuard.app
+          ditto -c -k --keepParent TimeGuard.app ../TimeGuard-Mac.zip
+      - uses: actions/upload-artifact@v4
+        with: { name: TimeGuard-mac, path: TimeGuard-Mac.zip }
+
+  release:
+    needs: [android, mac]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { merge-multiple: true }
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: timeguard
+          name: TimeGuard (latest)
+          make_latest: false
+          body: |
+            **Phone:** download TimeGuard.apk on your Pixel and install it.
+            **Mac:** download TimeGuard-Mac.zip, unzip, drag TimeGuard to Programs, right-click → Open the first time.
+          files: |
+            TimeGuard.apk
+            TimeGuard-Mac.zip

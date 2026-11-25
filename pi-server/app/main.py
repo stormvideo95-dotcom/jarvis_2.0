@@ -18,7 +18,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import brain, config, ha, music, musicsync, settings, storm_study, study, stt, tts
+from . import brain, config, guard, ha, music, musicsync, settings, storm_study, study, stt, tts
 from .wake import WakeListener
 from .nest import Nest
 
@@ -72,6 +72,12 @@ def _play_query(query: str):
 study_wait = threading.Event()   # set when Jarvis finished asking and waits for your answer
 
 
+def listen_say(text: str):
+    """Say something and then listen for the answer (no wake word / button needed)."""
+    study_wait.clear()
+    say(text, then=study_wait.set)
+
+
 def study_say(text: str):
     """Say something in study mode; afterwards listen for the answer by itself."""
     study_wait.clear()
@@ -84,6 +90,8 @@ def study_say(text: str):
 def _study_silence():
     if study.session.active:
         study_say(study.session.silence())
+    elif guard.pending:
+        guard.pending.clear()
 
 
 def _study_stopped_by_voice():
@@ -175,7 +183,28 @@ def quick_intent(text: str):
     return None
 
 
+def _entry(text, said, action):
+    e = {"time": time.strftime("%H:%M:%S"), "heard": text, "said": study.clean(said), "action": action}
+    history.appendleft(e)
+    return e
+
+
+def _guard_reply(answer: str, wait: bool, text: str, action: str) -> dict:
+    (listen_say if wait else say)(answer)
+    return _entry(text, answer, action)
+
+
+_UNLOCK_WORDS = r"\b(unlock|ontgrendel|ontgrendelen|open|openen|vrijgeven|mag ik|kan ik|scrollen|scroll|deblokkeer)\b"
+
+
 def handle_text(text: str) -> dict:
+    if guard.pending and not study.session.active:
+        res = guard.answer_pending(text)
+        if res:
+            return _guard_reply(res[0], res[1], text, "guard")
+    if not study.session.active and re.search(_UNLOCK_WORDS, study._plain(text)) and guard.find_app(text):
+        answer, wait = guard.voice_unlock(guard.find_app(text), guard.parse_minutes(text))
+        return _guard_reply(answer, wait, text, "guard_unlock")
     intent = None if study.session.active else quick_intent(text)
     if intent == "study_start":
         answer = study.session.start(text)
@@ -196,7 +225,7 @@ def handle_text(text: str) -> dict:
         entry = {"time": time.strftime("%H:%M:%S"), "heard": text, "said": study.clean(answer), "action": "study"}
         history.appendleft(entry)
         return entry
-    reply = brain.ask(text, ha.prompt_block() + musicsync.prompt_block())
+    reply = brain.ask(text, ha.prompt_block() + musicsync.prompt_block() + guard.prompt_block())
     action = reply["action"] or {}
     kind = action.get("type")
     log.info("heard=%r say=%r action=%r", text, reply["say"], action)
@@ -207,6 +236,19 @@ def handle_text(text: str) -> dict:
     elif kind == "home":
         problem = ha.run(action) if ha.enabled() else "Home Assistant is nog niet gekoppeld."
         say(problem or reply["say"])
+    elif kind == "guard_unlock":
+        app = action.get("app") if action.get("app") in list(guard.APPS) + ["all"] else guard.find_app(text)
+        minutes = action.get("minutes") if isinstance(action.get("minutes"), (int, float)) else guard.parse_minutes(text)
+        reply["say"], wait = guard.voice_unlock(app, minutes)
+        (listen_say if wait else say)(reply["say"])
+    elif kind == "guard_lock":
+        app = action.get("app") if action.get("app") in list(guard.APPS) + ["all"] else (guard.find_app(text) or "all")
+        guard.lock(app)
+        reply["say"] = "Alles staat weer op slot." if app == "all" else f"{guard.APPS[app][0]} staat weer op slot."
+        say(reply["say"])
+    elif kind == "guard_status":
+        reply["say"] = guard.voice_status()
+        say(reply["say"])
     elif kind == "study_start":
         reply["say"] = study.session.start(text)
         study_say(reply["say"])
@@ -411,6 +453,45 @@ def board_status():
             "wake": wake.status()}
 
 
+# ---- TimeGuard (phone + Mac apps) ---------------------------------------------
+@app.get("/api/guard/status")
+def guard_status(device: str = "", x_jarvis_key: str = Header(default="")):
+    _check_key(x_jarvis_key)
+    return guard.status(device or None)
+
+
+@app.post("/api/guard/usage")
+async def guard_usage(request: Request, x_jarvis_key: str = Header(default="")):
+    _check_key(x_jarvis_key)
+    body = await request.json()
+    return guard.report(str(body.get("device") or "?")[:30], body.get("items") or [])
+
+
+@app.post("/api/guard/settings")
+async def guard_settings(request: Request, x_jarvis_key: str = Header(default="")):
+    _check_key(x_jarvis_key)
+    body = await request.json()
+    return guard.settings(body.get("enabled"), body.get("limit_min"))
+
+
+@app.post("/api/guard/lock")
+def guard_lock_all(x_jarvis_key: str = Header(default="")):
+    _check_key(x_jarvis_key)
+    guard.lock("all")
+    return guard.status()
+
+
+@app.get("/api/guard/public")
+def guard_public():
+    st = guard.status()
+    return {"remaining_min": st["remaining_min"], "limit_min": st["limit_min"], "open": list(st["grants"])}
+
+
+@app.get("/guard/blocked", response_class=HTMLResponse)
+def guard_blocked(app_name: str = ""):
+    return (Path(__file__).parent / "blocked.html").read_text(encoding="utf-8")
+
+
 @app.get("/api/settings")
 def get_settings():
     return {**settings.get(), "wake_words": settings.WAKE_WORDS}
@@ -449,6 +530,7 @@ def health():
                        "answered": study.session.answered, "correct": study.session.correct}
                       if study.session.active else None),
             "storm_study": storm_study.status(),
+            "guard": {k: v for k, v in guard.status().items() if k != "apps"},
             "nest": (lambda s: s["name"] or s["ip"] or "auto")(nest.chosen())}
 
 

@@ -29,7 +29,7 @@ Voorbeelden:
 "hoe ver is de maan" -> {"say": "Gemiddeld zo'n 384.000 kilometer.", "action": null}
 """
 
-ACTIONS = {"study_start", "study_update", "home", "music_from", "music_to", "play_music", "pause", "resume", "skip", "stop", "volume", "timer"}
+ACTIONS = {"guard_unlock", "guard_lock", "guard_status", "study_start", "study_update", "home", "music_from", "music_to", "play_music", "pause", "resume", "skip", "stop", "volume", "timer"}
 
 _history: deque = deque(maxlen=8)  # last 4 exchanges
 _client = None

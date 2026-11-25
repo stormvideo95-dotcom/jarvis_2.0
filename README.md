@@ -73,6 +73,19 @@ First time: the Jarvis page shows a 6-digit code → Music AI app → Settings �
 Then: *"speel mijn gsm hier verder"*, *"zet het verder op mijn Mac"*, or use **Play on → Jarvis (Nest)** in the app.
 No APK update needed.
 
+## TimeGuard (social media limit)
+
+Jarvis keeps a daily budget (default **2 hours**, change it on the Jarvis page). Instagram, TikTok, Snapchat,
+YouTube, WhatsApp, Reddit, X and Facebook stay **locked** on the phone and Mac until Jarvis opens them:
+
+- *"Jarvis, unlock WhatsApp 15 minuten"* → open right away
+- *"Mag ik Instagram scrollen?"* → "Je hebt nog 1 uur over. Hoe lang?" → "15 minuten"
+- *"Ik wil alleen mijn Instagram-berichten checken"* → only the DMs, feed and Reels stay locked
+- *"Hoeveel social media tijd heb ik nog?"* · *"Zet alles op slot"*
+
+Long YouTube videos and Instagram messages count half, Shorts count full. Everything resets at midnight.
+Apps: **Releases → TimeGuard** (TimeGuard.apk for the phone, TimeGuard-Mac.zip for the Mac).
+
 ## Things you can say
 
 | Say | Jarvis does |
