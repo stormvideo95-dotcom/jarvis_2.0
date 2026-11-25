@@ -361,7 +361,11 @@ class Session:
         s = _core(said)
         if not s or not _core(answer):
             return False
-        alts = [_core(x) for x in re.split(r"\s*(?:/|;|\bof\b|\bou\b)\s*", answer) if _core(x)] or [_core(answer)]
+        pieces = [answer, re.sub(r"\(.*?\)", " ", answer)] + re.findall(r"\((.*?)\)", answer)
+        alts = []
+        for piece in pieces:   # "luchtpijptakken (bronchiën)", "neusholte of mondholte", "a / b"
+            alts += [_core(x) for x in re.split(r"\s*(?:/|;|,|\bof\b|\bou\b)\s*", piece) if _core(x)]
+        alts = list(dict.fromkeys(alts + [_core(answer)]))
         for alt in alts:
             if s == alt or (len(alt) >= 3 and re.search(rf"\b{re.escape(alt)}\b", s)):
                 return True
