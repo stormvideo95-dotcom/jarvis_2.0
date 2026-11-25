@@ -30,6 +30,7 @@ object Jarvis {
     @Volatile var limitMin = 120
     @Volatile var lastOk = 0L
     @Volatile var lastError = ""
+    @Volatile var offset = 0.0          // Jarvis clock minus phone clock (seconds)
 
     private fun prefs(ctx: Context) = ctx.getSharedPreferences("timeguard", Context.MODE_PRIVATE)
     fun url(ctx: Context) = prefs(ctx).getString("url", "http://192.168.0.249:8790")!!.trimEnd('/')
@@ -39,12 +40,12 @@ object Jarvis {
 
     fun isOpen(app: String): Boolean {
         if (!enabled) return true
-        val now = System.currentTimeMillis() / 1000.0
+        val now = System.currentTimeMillis() / 1000.0 + offset
         return (grants[app] ?: 0.0) > now || (grants["all"] ?: 0.0) > now
     }
 
     fun secondsLeft(app: String): Long {
-        val now = System.currentTimeMillis() / 1000.0
+        val now = System.currentTimeMillis() / 1000.0 + offset
         return (maxOf(grants[app] ?: 0.0, grants["all"] ?: 0.0) - now).toLong().coerceAtLeast(0)
     }
 
@@ -67,6 +68,7 @@ object Jarvis {
 
     private fun apply(ctx: Context, s: JSONObject) {
         enabled = s.optBoolean("enabled", true)
+        if (s.has("now")) offset = s.optDouble("now") - System.currentTimeMillis() / 1000.0
         remainingMin = s.optDouble("remaining_min", -1.0)
         limitMin = s.optInt("limit_min", 120)
         val g = s.optJSONObject("grants") ?: JSONObject()

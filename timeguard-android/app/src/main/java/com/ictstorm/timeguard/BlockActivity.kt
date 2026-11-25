@@ -56,7 +56,11 @@ class BlockActivity : Activity() {
                     packageManager.getLaunchIntentForPackage(Jarvis.packages.entries.firstOrNull { it.value == app }?.key ?: "")
                         ?.let { startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
                     finish()
-                } else h.postDelayed(this, 2000)
+                } else {
+                    // ask Jarvis now, so a voice unlock opens the app within ~2 s
+                    Thread { Jarvis.refresh(this@BlockActivity) }.start()
+                    h.postDelayed(this, 2000)
+                }
             }
         }, 2000)
     }

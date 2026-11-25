@@ -171,8 +171,10 @@ def find_app(text: str):
     return None
 
 
-def parse_minutes(text: str):
-    t = (text or "").lower()
+def parse_minutes(text: str, bare: bool = True):
+    """Minutes in a sentence. bare=False: only numbers with a unit ("5 min", "een kwartier"),
+    so "100% zeker" is not read as 100 minutes."""
+    t = re.sub(r"\d+\s*(%|procent|percent)", " ", (text or "").lower())
     m = re.search(r"(\d{1,3})\s*(min|minuten|minuut|m\b)", t)
     if m:
         return int(m.group(1))
@@ -183,6 +185,11 @@ def parse_minutes(text: str):
         return 30
     if "kwartier" in t:
         return 15
+    for w, v in sorted(NUM_WORDS.items(), key=lambda kv: -len(kv[0])):
+        if re.search(rf"\b{w}\s+(min|minuten|minuut|minutes|uur)\b", t):
+            return v * 60 if t.split(w, 1)[1].strip().startswith("uur") and w not in ("half uur", "halfuur") else v
+    if not bare:
+        return None
     m = re.search(r"\b(\d{1,3})\b", t)
     if m:
         return int(m.group(1))
@@ -245,7 +252,10 @@ def answer_pending(text: str) -> tuple[str, bool] | None:
         return "Oké, alles blijft op slot. Goed bezig!", False
     named = find_app(t)
     app = named if named and named != "all" else (pending.get("app") or named)
-    minutes = parse_minutes(t) or pending.get("minutes")
+    # "Zeker dat je ... 5 minuten?" -> "ja" / "100% zeker" keeps the 5 minutes.
+    # Only a number WITH a unit ("nee, 10 minuten") changes it then.
+    asked_minutes = pending.get("minutes")
+    minutes = (parse_minutes(t, bare=False) or asked_minutes) if asked_minutes else parse_minutes(t)
     if not app:
         return "Welke app bedoel je? Bijvoorbeeld WhatsApp of Instagram.", True
     if minutes is None:

@@ -37,6 +37,8 @@ final class Guard: NSObject, NSApplicationDelegate {
     var remaining: Double = -1
     var limit = 120
     var lastOK = Date.distantPast
+    var offset: Double = 0            // Jarvis clock minus Mac clock
+    var checking = false
     var lastError = ""
     var usage: [String: Double] = [:]      // "app|shorts" -> seconds
     var lastTick = Date()
@@ -49,7 +51,7 @@ final class Guard: NSObject, NSApplicationDelegate {
         if jarvisKey.isEmpty { askSettings() }
         refresh()
         Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { _ in self.tick() }
-        Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { _ in self.syncWithJarvis() }
+        Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { _ in self.syncWithJarvis() }
     }
 
     // ---- menu -----------------------------------------------------------------
@@ -73,7 +75,7 @@ final class Guard: NSObject, NSApplicationDelegate {
         let mins = Int(max(0, remaining))
         let txt = !enabled ? "🔓" : remaining < 0 ? "🔒" : String(format: "🔒 %d:%02d", mins / 60, mins % 60)
         item.button?.title = txt
-        let now = Date().timeIntervalSince1970
+        let now = Date().timeIntervalSince1970 + offset
         let open = grants.filter { $0.value > now }.map { "\($0.key) \(Int(($0.value - now) / 60)) min" }
         statusLine.title = !enabled ? "TimeGuard staat uit op Jarvis"
             : Date().timeIntervalSince(lastOK) > 60 ? "Jarvis niet bereikbaar \(lastError.isEmpty ? "" : "(\(lastError))")"
@@ -136,6 +138,7 @@ final class Guard: NSObject, NSApplicationDelegate {
         enabled = s["enabled"] as? Bool ?? true
         remaining = s["remaining_min"] as? Double ?? -1
         limit = s["limit_min"] as? Int ?? 120
+        if let n = (s["now"] as? NSNumber)?.doubleValue { offset = n - Date().timeIntervalSince1970 }
         grants = (s["grants"] as? [String: Any] ?? [:]).compactMapValues { ($0 as? NSNumber)?.doubleValue }
         defaults.set(grants, forKey: "grants")
         if let apps = s["apps"] as? [String: Any] {
@@ -162,7 +165,7 @@ final class Guard: NSObject, NSApplicationDelegate {
 
     func isOpen(_ app: String) -> Bool {
         if !enabled { return true }
-        let now = Date().timeIntervalSince1970
+        let now = Date().timeIntervalSince1970 + offset
         return (grants[app] ?? 0) > now || (grants["all"] ?? 0) > now
     }
 
@@ -172,7 +175,7 @@ final class Guard: NSObject, NSApplicationDelegate {
         updateTitle()
         guard let front = NSWorkspace.shared.frontmostApplication, let bundle = front.bundleIdentifier else { return }
         if let app = nativeApps[bundle] {                         // WhatsApp desktop app
-            if isOpen(app) { count(app, shorts: false, dt) } else { front.hide(); showBlocked(app: app, back: nil) }
+            if isOpen(app) { count(app, shorts: false, dt) } else if freshOrCheck() { front.hide(); showBlocked(app: app, back: nil) }
             return
         }
         guard let b = browsers.first(where: { $0.bundle == bundle }), let url = currentURL(b),
@@ -185,10 +188,18 @@ final class Guard: NSObject, NSApplicationDelegate {
         }
         if isOpen(app) {
             count(app, shorts: app == "youtube" && path.hasPrefix("/shorts"), dt)
-        } else {
+        } else if freshOrCheck() {
             let enc = url.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
             setURL(b, "\(jarvisURL)/guard/blocked?app=\(app)&back=\(enc)")
         }
+    }
+
+    /// True when the last answer from Jarvis is recent enough to lock on. Otherwise ask Jarvis first
+    /// and decide on the next tick — so a fresh voice unlock never bounces between open and locked.
+    func freshOrCheck() -> Bool {
+        if Date().timeIntervalSince(lastOK) < 3 || Date().timeIntervalSince(lastOK) > 60 { return true }
+        if !checking { checking = true; request("/api/guard/status?device=mac") { _ in self.checking = false } }
+        return false
     }
 
     func siteApp(host: String, path: String) -> String? {
