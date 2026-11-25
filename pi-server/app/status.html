@@ -79,7 +79,10 @@ async function load() {
     `<span class="pill">Home Assistant <b>${esc(h.home_assistant)}</b></span>` +
     `<span class="pill">Music AI <b>${h.music_ai.paired ? 'gekoppeld' : (h.music_ai.code ? 'code ' + esc(h.music_ai.code) : esc(h.music_ai.error || 'koppelen…'))}</b></span>`;
   if (h.study) document.getElementById('pills').innerHTML +=
-    `<span class="pill" style="border-color:var(--accent)">Studeren <b>${esc(h.study.subject)} · ${esc(h.study.game || '…')} · ${h.study.correct}/${Math.max(0, h.study.n - 1)}${h.study.points ? ' · ' + h.study.points + ' pt' : ''}</b></span>`;
+    `<span class="pill" style="border-color:var(--accent)">Studeren <b>${esc(h.study.subject)} · ${esc(h.study.game || '…')} · ${h.study.correct}/${h.study.answered}</b></span>`;
+  const ss = h.storm_study || {};
+  document.getElementById('pills').innerHTML += `<span class="pill">Storm Study <b>${!ss.linked ? 'niet gekoppeld' :
+     (ss.topics ? ss.topics + ' onderwerpen · ' + ss.mistakes + ' fouten' + (ss.points != null ? ' · ' + ss.points + ' pt' : '') : 'zeg "update study mode"')}${ss.queued ? ' · ' + ss.queued + ' in wachtrij' : ''}</b></span>`;
   const mc = document.getElementById('musiccode');
   if (h.music_ai.code && !h.music_ai.paired) {
     mc.style.display = '';

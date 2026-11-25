@@ -16,7 +16,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import brain, config, ha, music, musicsync, settings, study, stt, tts
+from . import brain, config, ha, music, musicsync, settings, storm_study, study, stt, tts
 from .wake import WakeListener
 from .nest import Nest
 
@@ -158,7 +158,7 @@ def handle_text(text: str) -> dict:
     if study.session.active:
         answer = study.session.handle(text)
         study_say(answer)
-        entry = {"time": time.strftime("%H:%M:%S"), "heard": text, "said": answer, "action": "study"}
+        entry = {"time": time.strftime("%H:%M:%S"), "heard": text, "said": study.clean(answer), "action": "study"}
         history.appendleft(entry)
         return entry
     reply = brain.ask(text, ha.prompt_block() + musicsync.prompt_block())
@@ -173,7 +173,12 @@ def handle_text(text: str) -> dict:
         problem = ha.run(action) if ha.enabled() else "Home Assistant is nog niet gekoppeld."
         say(problem or reply["say"])
     elif kind == "study_start":
-        study_say(study.session.start(action.get("subject") or ""))
+        reply["say"] = study.session.start(text)
+        study_say(reply["say"])
+    elif kind == "study_update":
+        say("Even kijken op Storm Study.")
+        reply["say"] = storm_study.update()
+        say(reply["say"])
     elif kind == "music_from":
         tracks, start_ms, dev = musicsync.take_from(action.get("device", ""))
         if not dev:
@@ -205,7 +210,7 @@ def handle_text(text: str) -> dict:
     else:
         say(reply["say"])
 
-    entry = {"time": time.strftime("%H:%M:%S"), "heard": text, "said": reply["say"], "action": kind}
+    entry = {"time": time.strftime("%H:%M:%S"), "heard": text, "said": study.clean(reply["say"]), "action": kind}
     history.appendleft(entry)
     return entry
 
@@ -397,8 +402,9 @@ def health():
             "home_assistant": ("verbonden" if ha.ping() else "fout") if ha.enabled() else "niet gekoppeld",
             "music_ai": musicsync.status(),
             "study": ({"subject": study.session.label(), "game": study.session.game, "n": study.session.n,
-                       "correct": study.session.correct, "points": study.session.points}
+                       "answered": study.session.answered, "correct": study.session.correct}
                       if study.session.active else None),
+            "storm_study": storm_study.status(),
             "nest": (lambda s: s["name"] or s["ip"] or "auto")(nest.chosen())}
 
 

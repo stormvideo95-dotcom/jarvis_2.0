@@ -21,7 +21,11 @@ RUN mkdir -p /voices \
  && curl -fsSL -o /voices/nl_BE-nathalie-medium.onnx \
     https://huggingface.co/rhasspy/piper-voices/resolve/main/nl/nl_BE/nathalie/medium/nl_BE-nathalie-medium.onnx \
  && curl -fsSL -o /voices/nl_BE-nathalie-medium.onnx.json \
-    https://huggingface.co/rhasspy/piper-voices/resolve/main/nl/nl_BE/nathalie/medium/nl_BE-nathalie-medium.onnx.json
+    https://huggingface.co/rhasspy/piper-voices/resolve/main/nl/nl_BE/nathalie/medium/nl_BE-nathalie-medium.onnx.json \
+ && curl -fsSL -o /voices/fr_FR-siwis-medium.onnx \
+    https://huggingface.co/rhasspy/piper-voices/resolve/main/fr/fr_FR/siwis/medium/fr_FR-siwis-medium.onnx \
+ && curl -fsSL -o /voices/fr_FR-siwis-medium.onnx.json \
+    https://huggingface.co/rhasspy/piper-voices/resolve/main/fr/fr_FR/siwis/medium/fr_FR-siwis-medium.onnx.json
 
 RUN mkdir -p /data
 COPY app ./app

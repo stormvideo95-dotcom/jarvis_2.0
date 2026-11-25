@@ -46,12 +46,20 @@ The Pi installer asks once for a Home Assistant long-lived token
 lights, switches, scenes, fans and the thermostat (`HA_DOMAINS` in `.env`) and read temperatures.
 Locks, alarms and garage doors are left out on purpose.
 
-## Study mode
+## Study mode (Storm Study)
 
-Say **"Jarvis, start studiemodus"**. Jarvis asks: what to study (**NW, HB, Frans**), which game
-(**quiz kahoot** = A-D with points, **quiz type** = open questions, **quiz mix** = everything mixed)
-and how many questions (a number, or "tot ik stop zeg"). Questions come from your own study material
-in `pi-server/app/leerstof/` (from Storm Study). Jarvis listens by itself after every question; say **stop** to end.
+Linked to **study.ictstorm.com**. The Pi installer asks once for your **Jarvis code** (`jv_...`),
+stored only in `.env` as `STUDY_JARVIS_TOKEN`.
+
+- **"Jarvis, update study mode"**: fetches `/api/jarvis`, saves `data/study_cache.json` and says what's new
+  ("Er is 1 nieuw onderwerp: ... en je hebt 7 open fouten").
+- **"Jarvis, start study mode"**: asks only what you didn't say yet. In one go also works:
+  *"start study mode NW transport en ademhaling, kahoot, 10 vragen"* or *"start study mode mijn fouten"*.
+- Games: **quiz kahoot** (4 options), **quiz typ** (open), **quiz mix** (kahoot + open + juist/fout + volgordes).
+- Lenient checking (capitals, de/het/le/la, small pronunciation differences), NVIDIA model as judge when unsure.
+- Every answer is posted to Storm Study (+10 points, mistakes list); 5 in a row = +25 bonus.
+- French words are spoken with a French voice.
+- Site down? Jarvis uses the cache and queues answers until the site is back.
 
 ## Say "stop"
 

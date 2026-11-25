@@ -55,6 +55,29 @@ if command -v ss >/dev/null && ss -ltn | grep -q ":$PORT " && ! $DOCKER ps --for
 fi
 JKEY=$(grep '^JARVIS_KEY=' .env | cut -d= -f2-)
 
+# ---- Storm Study link (asked once) ----
+if ! grep -q '^STUDY_JARVIS_TOKEN=' .env; then
+  printf '\n# Storm Study\nSTUDY_URL=https://study.ictstorm.com\nSTUDY_JARVIS_TOKEN=\n' >> .env
+fi
+if [ -z "$(grep '^STUDY_JARVIS_TOKEN=' .env | cut -d= -f2-)" ] && [ ! -f data/.study_skipped ]; then
+  say "Connect Storm Study (optional)"
+  echo "On study.ictstorm.com: your account -> Jarvis -> make a Jarvis code (starts with jv_)."
+  printf "Paste the Jarvis code (or press Enter to skip): " > $TTY
+  read -rs JVCODE < $TTY; echo > $TTY
+  if [ -n "$JVCODE" ]; then
+    sed -i "s#^STUDY_JARVIS_TOKEN=.*#STUDY_JARVIS_TOKEN=$JVCODE#" .env
+    CODE=$(curl -s -o /dev/null -w '%{http_code}' -m 8 -H "Authorization: Bearer $JVCODE" https://study.ictstorm.com/api/jarvis || true)
+    case "$CODE" in
+      200) ok "Storm Study connected" ;;
+      401) echo "Saved, but Storm Study says the code is wrong or expired. Run this again with a new code." ;;
+      *)   echo "Saved. Storm Study did not answer yet (HTTP $CODE); Jarvis will try again later." ;;
+    esac
+  else
+    touch data/.study_skipped
+    echo "Skipped. To add it later: rm $DIR/data/.study_skipped and run this install again."
+  fi
+fi
+
 # ---- Home Assistant link (asked once) ----
 if ! grep -q '^HA_URL=' .env; then
   printf '\n# Home Assistant\nHA_URL=http://127.0.0.1:8123\nHA_TOKEN=\nHA_DOMAINS=light,switch,scene,fan,climate,input_boolean\n' >> .env

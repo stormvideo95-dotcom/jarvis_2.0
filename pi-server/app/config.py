@@ -24,6 +24,7 @@ UDP_PORT = int(_env("UDP_PORT", "8791"))  # board mic stream in wake word mode
 JARVIS_KEY = _env("JARVIS_KEY", "")  # shared secret the board sends
 
 PIPER_VOICE = _env("PIPER_VOICE", "/voices/nl_BE-nathalie-medium.onnx")
+PIPER_VOICE_FR = _env("PIPER_VOICE_FR", "/voices/fr_FR-siwis-medium.onnx")  # for French words
 AUDIO_DIR = _env("AUDIO_DIR", "/tmp/jarvis-audio")
 # Written by `python -m app.pick_speaker`; overrides NEST_NAME / NEST_IP when present
 SPEAKER_FILE = _env("SPEAKER_FILE", "/data/speaker.json")
@@ -36,3 +37,7 @@ HA_DOMAINS = {d.strip() for d in _env("HA_DOMAINS", "light,switch,scene,fan,clim
 
 # Music AI taste server (same Pi) so Jarvis can take over / hand off songs
 MUSIC_AI_URL = _env("MUSIC_AI_URL", "http://127.0.0.1:8765")
+
+# Storm Study (study.ictstorm.com): leerstof + your mistakes/points for study mode
+STUDY_URL = _env("STUDY_URL", "https://study.ictstorm.com")
+STUDY_JARVIS_TOKEN = _env("STUDY_JARVIS_TOKEN", "")   # starts with jv_, keep it only in .env
