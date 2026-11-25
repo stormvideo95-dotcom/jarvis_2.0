@@ -68,7 +68,7 @@ class Nest:
     def _play(self, url, ctype, title, start=0.0):
         mc = self._mc()
         mc.play_media(url, ctype, title=title, current_time=start, stream_type="BUFFERED")
-        mc.block_until_active(timeout=10)
+        mc.block_until_active(timeout=25)
 
     def _jarvis_music_position(self):
         """Seconds into Jarvis' own song if it is what the Nest is playing, else None."""
@@ -116,6 +116,11 @@ class Nest:
         with self._lock:
             self.music = track
             self._play(track["url"], track["type"], track["title"], start)
+        try:
+            from . import music
+            music.prefetch(1)   # next song ready before this one ends
+        except Exception:
+            pass
 
     def music_status(self):
         """(state, seconds) of Jarvis' own song on the Nest; state is None if something else plays."""
@@ -134,7 +139,15 @@ class Nest:
         self._mc().pause()
 
     def resume(self):
-        self._mc().play()
+        mc = self._mc()
+        st = mc.status
+        if self.music and (st.content_id != self.music["url"] or st.player_state in ("IDLE", "UNKNOWN")):
+            # the Nest forgot the song (stopped, other app, restart): start it again
+            pos = float(getattr(st, "adjusted_current_time", None) or st.current_time or 0.0) \
+                if st.content_id == self.music["url"] else 0.0
+            self.play_track(self.music, pos)
+        else:
+            mc.play()
 
     def stop(self):
         self.music = None

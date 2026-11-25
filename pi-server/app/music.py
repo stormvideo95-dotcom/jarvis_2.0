@@ -1,8 +1,17 @@
-"""Music for the Nest: a queue of YouTube tracks, resolved to stream URLs with yt-dlp.
+"""Music for the Nest: a queue of YouTube tracks.
+
+Songs are downloaded to the Pi (data/music_cache, max ~1.5 GB, oldest removed first)
+and served to the Nest from Jarvis itself: the Nest can't open YouTube's own links.
 
 Tracks are dicts in the Music AI format: {"id", "title", "artists", ...}.
 """
+import os
 import threading
+
+from . import config
+
+CACHE = os.path.join(os.path.dirname(config.SPEAKER_FILE), "music_cache")
+CACHE_MAX = 1500 * 1024 * 1024
 
 _lock = threading.RLock()
 _queue: list[dict] = []
@@ -15,18 +24,58 @@ def _ydl(opts: dict):
     return YoutubeDL({"quiet": True, "no_warnings": True, "noplaylist": True, **opts})
 
 
+def _trim_cache():
+    files = sorted((os.path.join(CACHE, f) for f in os.listdir(CACHE)), key=os.path.getmtime)
+    total = sum(os.path.getsize(f) for f in files)
+    while files and total > CACHE_MAX:
+        f = files.pop(0)
+        total -= os.path.getsize(f)
+        os.remove(f)
+
+
+def _download(video_id: str) -> tuple[str, dict]:
+    """Download the audio once (m4a), return (filename, info)."""
+    os.makedirs(CACHE, exist_ok=True)
+    for f in os.listdir(CACHE):
+        if f.startswith(video_id + "."):
+            os.utime(os.path.join(CACHE, f))
+            return f, {}
+    opts = {"format": "bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio",
+            "outtmpl": os.path.join(CACHE, "%(id)s.%(ext)s"), "noprogress": True, "retries": 3}
+    with _ydl(opts) as y:
+        info = y.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=True)
+    name = os.path.basename(info.get("requested_downloads", [{}])[0].get("filepath") or
+                            f"{video_id}.{info.get('ext', 'm4a')}")
+    try:
+        _trim_cache()
+    except OSError:
+        pass
+    return name, info
+
+
 def _resolve(meta: dict) -> dict:
-    with _ydl({"format": "bestaudio[ext=m4a]/bestaudio"}) as y:
-        info = y.extract_info(f"https://www.youtube.com/watch?v={meta['id']}", download=False)
-    ext = info.get("ext") or "m4a"
-    ctype = {"m4a": "audio/mp4", "mp4": "audio/mp4", "webm": "audio/webm"}.get(ext, "audio/mp4")
+    name, info = _download(meta["id"])
+    ext = name.rsplit(".", 1)[-1]
+    ctype = {"m4a": "audio/mp4", "mp4": "audio/mp4", "webm": "audio/webm", "opus": "audio/ogg"}.get(ext, "audio/mp4")
     title = meta.get("title") or info.get("title") or "Muziek"
     full = {**meta, "title": title}
     if not full.get("artists") and info.get("uploader"):
         full["artists"] = [info["uploader"]]
     if not full.get("duration") and info.get("duration"):
         full["duration"] = int(info["duration"])
-    return {"id": meta["id"], "title": title, "url": info["url"], "type": ctype, "meta": full}
+    url = f"{config.PUBLIC_URL}/media/{name}"
+    return {"id": meta["id"], "title": title, "url": url, "type": ctype, "meta": full}
+
+
+def prefetch(n: int = 1):
+    """Download the next song(s) in the background so they start instantly."""
+    def run():
+        for meta in upcoming(n):
+            try:
+                _download(meta["id"])
+            except Exception:
+                pass
+    threading.Thread(target=run, daemon=True).start()
 
 
 def _advance(start: int) -> dict | None:

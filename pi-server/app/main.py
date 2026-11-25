@@ -4,6 +4,8 @@ Board (hold BOOT, talk) --WAV--> POST /api/talk --> NVIDIA Whisper (speech->text
 --> NVIDIA LLM (answer + action) --> Piper (text->speech) --> cast to Nest Mini.
 """
 import logging
+import os
+import re
 import threading
 import time
 import uuid
@@ -28,6 +30,8 @@ AUDIO.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(title="Jarvis 2.0")
 app.mount("/audio", StaticFiles(directory=AUDIO), name="audio")
+os.makedirs(music.CACHE, exist_ok=True)
+app.mount("/media", StaticFiles(directory=music.CACHE), name="media")   # songs for the Nest
 nest = Nest()
 history: deque = deque(maxlen=20)
 
@@ -154,7 +158,38 @@ def _skip():
         say("Geen volgend nummer meer.")
 
 
+_STUDY_WORDS = r"(study|studie|studi|studeer|stadie|stuudie|city|sturie|stoerie|studio|3|drie)"
+_MODE_WORDS = r"(mode|modus|mood|moed|modes|mot)"
+
+
+def quick_intent(text: str):
+    """Catch study-mode commands even when speech recognition mangles them."""
+    t = study._plain(text)
+    if re.search(_STUDY_WORDS + r"\s*" + _MODE_WORDS, t) or re.search(r"\bstudiemodus\b|\bstudeermodus\b", t) \
+            or (re.search(r"\bweek\s+\w+", t) and re.search(r"\b(studeer|studeren|leren|oefen|oefenen|quiz)\b", t)):
+        if re.search(r"\b(update|updaten|vernieuw|vernieuwen|ophalen|nieuwe leerstof)\b", t):
+            return "study_update"
+        if re.search(r"\b(stop|uit|stoppen)\b", t) and not re.search(r"\b(start|aan|begin|activeer|activate)\b", t):
+            return None
+        return "study_start"
+    return None
+
+
 def handle_text(text: str) -> dict:
+    intent = None if study.session.active else quick_intent(text)
+    if intent == "study_start":
+        answer = study.session.start(text)
+        study_say(answer)
+        entry = {"time": time.strftime("%H:%M:%S"), "heard": text, "said": study.clean(answer), "action": "study_start"}
+        history.appendleft(entry)
+        return entry
+    if intent == "study_update":
+        say("Even kijken op Storm Study.")
+        answer = storm_study.update()
+        say(answer)
+        entry = {"time": time.strftime("%H:%M:%S"), "heard": text, "said": answer, "action": "study_update"}
+        history.appendleft(entry)
+        return entry
     if study.session.active:
         answer = study.session.handle(text)
         study_say(answer)
@@ -220,6 +255,15 @@ def handle_audio(body: bytes) -> dict:
     if len(pcm) < rate * 2 * 0.3:  # under 0.3 s: button tap, ignore
         return {"heard": "", "said": "", "action": None}
     text = stt.transcribe(pcm, rate)
+    if study.session.active and not study.session.understands(text):
+        # short answers ("mix", "B") are often misheard in Dutch: try English too
+        try:
+            alt = stt.transcribe(pcm, rate, language="en")
+            if alt and study.session.understands(alt):
+                log.info("study: used English transcription %r instead of %r", alt, text)
+                text = alt
+        except Exception:
+            pass
     if not text and study.session.active:
         study_say("Ik verstond je niet. Zeg het nog eens?")
         return {"heard": "", "said": "Ik verstond je niet.", "action": "study"}

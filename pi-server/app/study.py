@@ -32,7 +32,8 @@ SUBJECT_WORDS = {
 }
 TOPIC_WORDS = {
     "cel": ("cel", "cellen", "de cel", "celleer", "organel", "organellen"),
-    "adem": ("adem", "ademhaling", "ademhalingsstelsel", "longen", "long", "ademen", "luchtwegen"),
+    "adem": ("adem", "ademhaling", "ademhalingsstelsel", "longen", "long", "ademen", "luchtwegen",
+             "longstelsel", "longenstelsel", "long stelsel", "longen stelsel"),
     "trans": ("trans", "transport", "transportstelsel", "bloed", "hart", "bloedsomloop", "bloedvaten", "bloedsomlopen"),
     "corps": ("corps", "le corps", "lichaam", "lichaamsdelen", "lichaamsdeel", "expressions", "uitdrukkingen"),
     "sens": ("sens", "les sens", "cinq sens", "zintuig", "zintuigen", "les cinq sens"),
@@ -44,6 +45,48 @@ STOP = ("stop", "stoppen", "genoeg", "einde", "hou op", "ik stop", "ik wil stopp
 NUMBERS = {"een": 1, "twee": 2, "drie": 3, "vier": 4, "vijf": 5, "zes": 6, "zeven": 7, "acht": 8,
            "negen": 9, "tien": 10, "elf": 11, "twaalf": 12, "dertien": 13, "veertien": 14, "vijftien": 15,
            "twintig": 20, "vijfentwintig": 25, "dertig": 30, "veertig": 40, "vijftig": 50}
+# Answer by letter or number: "A", "be", "1", "twee", "de derde", ...
+CHOICE_WORDS = {
+    0: ("a", "aa", "ah", "1", "een", "één", "eerste", "one", "nummer 1"),
+    1: ("b", "be", "bee", "2", "twee", "tweede", "two", "nummer 2"),
+    2: ("c", "ce", "cee", "see", "se", "3", "drie", "derde", "three", "nummer 3"),
+    3: ("d", "dee", "4", "vier", "vierde", "four", "nummer 4"),
+    4: ("e", "ee", "5", "vijf", "vijfde", "five", "nummer 5"),
+}
+WEEK_NUMS = {"een": 1, "twee": 2, "drie": 3, "vier": 4, "vijf": 5, "zes": 6, "zeven": 7, "acht": 8, "negen": 9, "tien": 10}
+WEEKS_FILE = os.path.join(os.path.dirname(storm_study.CACHE), "weeks.json")
+DEFAULT_WEEKS = {"2": ["trans", "adem"]}      # week 2 = transportstelsel + ademhalingsstelsel
+
+
+def pick_choice(text: str, n: int):
+    """Index of a choice said as a letter or number, else None."""
+    p = _plain(text)
+    words = p.split()
+    if not words:
+        return None
+    for idx in range(n):
+        for w in CHOICE_WORDS.get(idx, ()):
+            pw = _plain(w)
+            if p == pw or (len(words) <= 3 and pw in words) or re.search(rf"\b(antwoord|optie|letter|nummer|keuze)\s+{re.escape(pw)}\b", p):
+                return idx
+    return None
+
+
+def weeks() -> dict:
+    data = dict(DEFAULT_WEEKS)
+    try:
+        with open(WEEKS_FILE, encoding="utf-8") as f:
+            data.update(json.load(f))
+    except (OSError, ValueError):
+        pass
+    for t in storm_study.topics():      # a "week" field from Storm Study wins
+        if t.get("week"):
+            data.setdefault(str(t["week"]), [])
+            if t["id"] not in data[str(t["week"])]:
+                data[str(t["week"])].append(t["id"])
+    return data
+
+
 LETTERS = {"a": 0, "aa": 0, "b": 1, "be": 1, "bee": 1, "c": 2, "ce": 2, "cee": 2, "see": 2, "d": 3, "dee": 3}
 ARTICLES = {"de", "het", "een", "le", "la", "les", "l", "un", "une", "des", "du", "d", "the", "a"}
 
@@ -92,6 +135,7 @@ class Session:
         self.streak = 0
         self.best_streak = 0
         self.silent_turns = 0
+        self.misses = 0
         self.fallback_subject = None  # no Storm Study data: bundled txt + AI
 
     def label(self) -> str:
@@ -120,6 +164,14 @@ class Session:
         for tid, words in TOPIC_WORDS.items():
             if tid in ids and any(_has(text, w) for w in words):
                 out["topics"].append(tid)
+        m = re.search(r"\bweek\s+(\d{1,2}|" + "|".join(WEEK_NUMS) + r")\b", _plain(text))
+        if m:
+            wk = m.group(1)
+            wk = str(WEEK_NUMS.get(wk, wk))
+            out["week"] = wk
+            for tid in weeks().get(wk, []):
+                if tid in ids and tid not in out["topics"]:
+                    out["topics"].append(tid)
         for t in topics:   # exact names/ids from the site (new topics too)
             if t.get("id") not in out["topics"] and (_has(text, t.get("name", "")) or _has(text, t.get("id", ""))):
                 out["topics"].append(t["id"])
@@ -149,6 +201,27 @@ class Session:
             return []
         valid = {t["id"] for t in topics}
         return [i for i in ids if i in valid]
+
+    GAMES = ["mix", "typ", "kahoot"]
+    GAME_SOUNDS = {"mix": ("mix", "miks", "mik", "mieke", "mics", "meeks", "mixed", "gemengd", "alles door elkaar"),
+                   "typ": ("typ", "type", "tip", "tijp", "typen", "open", "open vragen", "taip"),
+                   "kahoot": ("kahoot", "kahut", "kahoe", "cahoot", "kaboet", "meerkeuze", "koud")}
+
+    @classmethod
+    def _pick_game_spoken(cls, text: str):
+        """Game from an answer to "which game?": letter/number, word, or something that sounds like it."""
+        i = pick_choice(text, 3)
+        if i is not None:
+            return cls.GAMES[i]
+        g = cls._pick_game(text)
+        if g:
+            return g
+        for word in _plain(text).split():
+            best = max(((difflib.SequenceMatcher(None, word, v).ratio(), g)
+                        for g, vs in cls.GAME_SOUNDS.items() for v in vs), default=(0, None))
+            if best[0] >= 0.75:
+                return best[1]
+        return None
 
     @staticmethod
     def _pick_game(text: str):
@@ -186,6 +259,8 @@ class Session:
             names = [t.get("name", t["id"]) for t in self._all_topics() if t["id"] in self.topic_ids]
             if not self.use_mistakes:
                 self.label_text = " en ".join(names) if len(names) <= 3 else f"{len(names)} onderwerpen"
+                if p.get("week"):
+                    self.label_text = f"week {p['week']}, " + self.label_text
         elif p["subject"] and not self._all_topics():
             self.fallback_subject = p["subject"]
             self.label_text = {"nw": "natuurwetenschappen", "hb": "historisch bewustzijn", "frans": "Frans"}[p["subject"]]
@@ -195,16 +270,59 @@ class Session:
             self.total = p["count"] or None
             self.count_set = True
 
+    MENU = [("nw", "NW"), ("frans", "Frans"), ("hb", "HB"), ("mistakes", "mijn fouten")]
+
+    def _menu(self) -> str:
+        opts = ". ".join(f"{'ABCD'[i]} of {i + 1}: {name}" for i, (_, name) in enumerate(self.MENU))
+        return f"Wat wil je studeren? {opts}. Of zeg een onderwerp of een week, zoals week 2."
+
+    def _ai_choice(self, text: str, choices: list):
+        """Speech recognition often mishears short words; let the AI guess what was meant."""
+        if not text.strip():
+            return None
+        try:
+            raw = brain._chat([{"role": "system", "content": "Je interpreteert een slecht verstaan gesproken antwoord. Antwoord alleen JSON."},
+                               {"role": "user", "content": f"Keuzes: {choices}. De spraakherkenning hoorde: \"{text}\" "
+                                                           "(kan verkeerd verstaan zijn, bv. 'Mieke' = mix, 'koud' = kahoot). "
+                                                           'Welke keuze bedoelde de leerling? {"choice": "<keuze of null>"}'}],
+                              max_tokens=30, temperature=0)
+            c = json.loads(re.search(r"\{.*\}", raw, re.S).group(0)).get("choice")
+        except Exception:
+            return None
+        return c if c in choices else None
+
+    def understands(self, text: str) -> bool:
+        """Quick check (no AI) whether this text answers the current step."""
+        if not text or not text.strip():
+            return False
+        if _wants_stop(text):
+            return True
+        if self.step == "pick":
+            p = self._parse(text)
+            return bool(p["topics"] or p["mistakes"] or p["subject"] or pick_choice(text, 4) is not None)
+        if self.step == "game":
+            return self._pick_game_spoken(text) is not None
+        if self.step == "count":
+            return self._pick_count(text) is not None
+        if self.step == "quiz" and self.current:
+            q = self.current
+            if q["kind"] == "kahoot":
+                return pick_choice(text, len(q["options"])) is not None or any(
+                    difflib.SequenceMatcher(None, _core(text), _core(o)).ratio() >= 0.75 for o in q["options"])
+            return self._match(text, q["a"])
+        return True
+
     def _have_selection(self) -> bool:
         return bool(self.topic_ids or self.use_mistakes or self.fallback_subject)
 
     def _next_prompt(self) -> str:
         if not self._have_selection():
             self.step = "pick"
-            return "Wat wil je studeren? Bijvoorbeeld NW, Frans, HB, of mijn fouten."
+            return self._menu()
         if not self.game:
             self.step = "game"
-            return f"{self.label_text[:1].upper() + self.label_text[1:]}, top. Welk spel? Quiz mix, quiz typ of quiz kahoot?"
+            return (f"{self.label_text[:1].upper() + self.label_text[1:]}, top. Welk spel? "
+                    "A of 1: mix. B of 2: typ. C of 3: kahoot.")
         if not self.count_set:
             self.step = "count"
             return "Hoeveel vragen wil je? Zeg een getal, of tot ik stop zeg."
@@ -335,7 +453,7 @@ class Session:
             opts = ". ".join(f"{'ABCD'[i]}: {self._say(o, q)}" for i, o in enumerate(q["options"]))
             return f"{head}{q['q']} {opts}."
         if q["kind"] == "juistfout":
-            return f"{head}Juist of fout? {q['q']} Antwoord: {self._say(q['shown'], q)}."
+            return f"{head}Juist of fout? {q['q']} Antwoord: {self._say(q['shown'], q)}. A is juist, B is fout."
         return f"{head}{q['q']}"
 
     def _begin(self) -> str:
@@ -393,17 +511,17 @@ class Session:
         q = self.current
         n = _plain(said)
         if q["kind"] == "kahoot":
-            words = n.split()
-            if words and words[0] in LETTERS and LETTERS[words[0]] < len(q["options"]) and len(words) <= 3:
-                return _core(q["options"][LETTERS[words[0]]]) == _core(q["a"])
-            m = re.search(r"\b(?:antwoord|optie|letter)\s+([abcd])\b", n)
-            if m and "abcd".index(m.group(1)) < len(q["options"]):
-                return _core(q["options"]["abcd".index(m.group(1))]) == _core(q["a"])
+            i = pick_choice(said, len(q["options"]))
+            if i is not None:
+                return _core(q["options"][i]) == _core(q["a"])
             best = max((difflib.SequenceMatcher(None, _core(said), _core(o)).ratio(), o) for o in q["options"])
             if best[0] >= 0.75:
                 return _core(best[1]) == _core(q["a"])
             return self._match(said, q["a"]) or self._judge(q, said)
         if q["kind"] == "juistfout":
+            i = pick_choice(said, 2)           # A/1 = juist, B/2 = fout
+            if i is not None:
+                return (i == 0) == q["truth"]
             yes = re.search(r"\b(juist|waar|klopt|correct|ja|goed)\b", n)
             no = re.search(r"\b(fout|onjuist|nee|niet waar|klopt niet)\b", n)
             if yes or no:
@@ -453,11 +571,13 @@ class Session:
         self.__init__()
         self.active = True
         if storm_study.enabled():
+            if not storm_study.topics():
+                storm_study.update()          # first time: fetch the material first
             storm_study.flush_queue()
         self._apply(self._parse(text))
         if not self._have_selection():
             self.step = "pick"
-            return "Studiemodus aan! Wat wil je studeren? NW, Frans, HB, of mijn fouten?"
+            return "Studiemodus aan! " + self._menu()
         return "Studiemodus aan. " + self._next_prompt()
 
     def stop(self) -> str:
@@ -481,16 +601,28 @@ class Session:
             return self.stop()
         if self.step == "pick":
             p = self._parse(text)
+            i = pick_choice(text, 4)
+            if not (p["topics"] or p["mistakes"] or p["subject"]) and i is not None:
+                key = self.MENU[i][0]
+                p = self._parse("mijn fouten" if key == "mistakes" else key)
             if not (p["topics"] or p["mistakes"] or p["subject"]):
                 p["topics"] = self._ai_pick_topics(text)
             self._apply(p)
             if not self._have_selection():
-                return "Dat vond ik niet. Zeg bijvoorbeeld NW, Frans, HB, ademhaling, of mijn fouten."
+                return "Dat vond ik niet. " + self._menu()
             return self._next_prompt()
         if self.step == "game":
-            g = self._pick_game(text)
+            g = self._pick_game_spoken(text) or self._ai_choice(text, ["mix", "typ", "kahoot"])
             if not g:
-                return "Kies quiz mix, quiz typ of quiz kahoot."
+                self.misses += 1
+                if self.misses >= 2:
+                    g = "mix"
+                    self.misses = 0
+                    self.game = g
+                    c = self._pick_count(text, strict=True)
+                    return "Ik kies mix voor jou. " + self._next_prompt()
+                return "Zeg A, B of C. A is mix, B is typ, C is kahoot."
+            self.misses = 0
             self.game = g
             c = self._pick_count(text, strict=True)
             if c is not None:
@@ -499,7 +631,13 @@ class Session:
         if self.step == "count":
             c = self._pick_count(text)
             if c is None:
-                return "Hoeveel vragen? Bijvoorbeeld tien, of tot ik stop zeg."
+                self.misses += 1
+                if self.misses >= 2:
+                    self.misses = 0
+                    self.total, self.count_set = 10, True
+                    return "Dan doen we er tien. " + self._begin()
+                return "Hoeveel vragen? Zeg een getal, bijvoorbeeld tien, of tot ik stop zeg."
+            self.misses = 0
             self.total, self.count_set = c or None, True
             return self._begin()
         if self.step == "quiz" and self.current:

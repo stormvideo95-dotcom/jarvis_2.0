@@ -33,17 +33,33 @@ def _service():
     return _asr
 
 
-def transcribe(pcm: bytes, rate: int = 16000) -> str:
+def transcribe(pcm: bytes, rate: int = 16000, language: str | None = None) -> str:
     import riva.client
 
     cfg = riva.client.RecognitionConfig(
         encoding=riva.client.AudioEncoding.LINEAR_PCM,
         sample_rate_hertz=rate,
-        language_code=config.LANGUAGE,
+        language_code=language or config.LANGUAGE,
         max_alternatives=1,
         enable_automatic_punctuation=True,
         audio_channel_count=1,
     )
     resp = _service().offline_recognize(pcm, cfg)
     parts = [r.alternatives[0].transcript for r in resp.results if r.alternatives]
-    return " ".join(p.strip() for p in parts).strip()
+    return clean(" ".join(p.strip() for p in parts).strip())
+
+
+# Things Whisper "hears" in silence or noise
+_GARBAGE = ("ondertiteling", "ondertiteld", "bedankt voor het kijken", "tv gelderland", "amara.org",
+            "thanks for watching", "subtitles by", "abonneer")
+
+
+def clean(text: str) -> str:
+    t = (text or "").strip()
+    letters = sum(c.isalnum() for c in t)
+    low = t.lower()
+    if letters == 0 or set(t) <= set("*. ,!?-"):
+        return ""
+    if any(g in low for g in _GARBAGE):
+        return ""
+    return t
