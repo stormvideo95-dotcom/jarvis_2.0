@@ -28,7 +28,18 @@ object Ui {
     const val TEXT = 0xFF0F0F12.toInt()
     const val MUTED = 0xFF8A8F9C.toInt()
 
-    val MEDIUM: Typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+    // Outfit: rounded geometric font like the design
+    var REG: Typeface = Typeface.DEFAULT
+    var MEDIUM: Typeface = Typeface.DEFAULT_BOLD
+    var SEMI: Typeface = Typeface.DEFAULT_BOLD
+
+    fun init(ctx: Context) {
+        runCatching {
+            REG = ctx.resources.getFont(R.font.outfit_regular)
+            MEDIUM = ctx.resources.getFont(R.font.outfit_medium)
+            SEMI = ctx.resources.getFont(R.font.outfit_semibold)
+        }
+    }
 
     fun dp(ctx: Context, v: Int) = (v * ctx.resources.displayMetrics.density).toInt()
 
@@ -58,7 +69,7 @@ object Ui {
 
     fun text(ctx: Context, s: String, size: Float = 16f, color: Int = TEXT, bold: Boolean = false) = TextView(ctx).apply {
         text = s; textSize = size; setTextColor(color)
-        if (bold) typeface = MEDIUM
+        typeface = if (bold) SEMI else REG
         setLineSpacing(0f, 1.12f)
     }
 
@@ -81,10 +92,10 @@ object Ui {
 
     /** Black (or white) pill button. */
     fun pill(ctx: Context, s: String, dark: Boolean = true, full: Boolean = false, onClick: () -> Unit) = TextView(ctx).apply {
-        text = s; textSize = 15f; typeface = MEDIUM; gravity = Gravity.CENTER
+        text = s; textSize = 13f; typeface = SEMI; gravity = Gravity.CENTER; letterSpacing = 0.04f
         setTextColor(if (dark) WHITE else BLACK)
         background = shape(ctx, if (dark) BLACK else WHITE, 28, if (dark) 0 else LINE)
-        setPadding(dp(ctx, 22), dp(ctx, 14), dp(ctx, 22), dp(ctx, 14))
+        setPadding(dp(ctx, 22), dp(ctx, 13), dp(ctx, 22), dp(ctx, 13))
         setOnClickListener { onClick() }
         layoutParams = lp(if (full) ViewGroup.LayoutParams.MATCH_PARENT else ViewGroup.LayoutParams.WRAP_CONTENT,
             top = dp(ctx, 14))
@@ -92,10 +103,11 @@ object Ui {
 
     /** Small chip (black when selected, light grey otherwise). */
     fun chip(ctx: Context, s: String, on: Boolean, onClick: () -> Unit) = TextView(ctx).apply {
-        text = s; textSize = 14f; typeface = MEDIUM; gravity = Gravity.CENTER
+        text = s; textSize = 13f; typeface = MEDIUM; gravity = Gravity.CENTER
+        includeFontPadding = false
         setTextColor(if (on) WHITE else BLACK)
-        background = shape(ctx, if (on) BLACK else SOFT, 22)
-        setPadding(dp(ctx, 16), dp(ctx, 10), dp(ctx, 16), dp(ctx, 10))
+        background = shape(ctx, if (on) BLACK else SOFT, 20)
+        setPadding(dp(ctx, 14), dp(ctx, 9), dp(ctx, 14), dp(ctx, 9))
         setOnClickListener { onClick() }
         layoutParams = lp(ViewGroup.LayoutParams.WRAP_CONTENT, right = dp(ctx, 8), top = dp(ctx, 8))
     }
@@ -112,7 +124,7 @@ object Ui {
             })
         }
         addView(dot, LinearLayout.LayoutParams(dp(ctx, 28), dp(ctx, 28)).apply { rightMargin = dp(ctx, 10) })
-        addView(text(ctx, s, 14f, BLACK, bold = true))
+        addView(text(ctx, s, 13f, BLACK, bold = true))
         isClickable = true
         setOnClickListener { onClick() }
         layoutParams = lp(ViewGroup.LayoutParams.WRAP_CONTENT, top = dp(ctx, 8))
@@ -126,7 +138,7 @@ object Ui {
     }
 
     fun field(ctx: Context, hint: String, value: String, single: Boolean = true) = EditText(ctx).apply {
-        setText(value); this.hint = hint; setTextColor(TEXT); setHintTextColor(MUTED); textSize = 16f
+        setText(value); this.hint = hint; setTextColor(TEXT); setHintTextColor(MUTED); textSize = 15f; typeface = REG
         background = shape(ctx, WHITE, 18, LINE)
         setPadding(dp(ctx, 16), dp(ctx, 14), dp(ctx, 16), dp(ctx, 14))
         isSingleLine = single

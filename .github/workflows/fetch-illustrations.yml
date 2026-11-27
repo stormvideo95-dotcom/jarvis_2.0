@@ -1,0 +1,35 @@
+name: Fetch app illustrations
+
+# Downloads the images listed in school-android/illustrations.txt into the app and commits them.
+on:
+  push:
+    paths: ["school-android/illustrations.txt"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download
+        run: |
+          set -e
+          sudo apt-get install -y -qq pngquant >/dev/null
+          dir=school-android/app/src/main/res/drawable-nodpi
+          mkdir -p $dir
+          while read -r name url; do
+            [ -z "$name" ] && continue
+            curl -fsSL "$url" -o "/tmp/$name.png"
+            python3 -c "import struct,sys;d=open('/tmp/$name.png','rb').read(24);print('$name',struct.unpack('>II',d[16:24]))"
+            pngquant --quality=70-90 --force --output "$dir/$name.png" "/tmp/$name.png" || cp "/tmp/$name.png" "$dir/$name.png"
+          done < school-android/illustrations.txt
+          ls -la $dir
+      - name: Commit
+        run: |
+          git config user.name "github-actions"; git config user.email "actions@github.com"
+          git add school-android/app/src/main/res/drawable-nodpi
+          git commit -m "Add app illustrations" || echo "nothing new"
+          git push

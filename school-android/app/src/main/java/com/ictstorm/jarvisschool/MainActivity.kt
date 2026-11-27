@@ -45,6 +45,7 @@ class MainActivity : Activity() {
     private var chatScroll: ScrollView? = null
     private var lastId = ""
     private var sending = false
+    private var pendingAsk: String? = null
     private val poll = object : Runnable {
         override fun run() {
             if (tab == "chat") fetchNew()
@@ -57,6 +58,7 @@ class MainActivity : Activity() {
     @Suppress("DEPRECATION")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Ui.init(this)
         window.statusBarColor = Ui.BG
         window.navigationBarColor = Ui.WHITE
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
@@ -96,9 +98,10 @@ class MainActivity : Activity() {
             nav.addView(LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL
                 addView(Ui.icon(this@MainActivity, res, if (on) Ui.BLUE_DARK else Ui.MUTED, 24))
-                addView(Ui.text(this@MainActivity, label, 12f, if (on) Ui.BLACK else Ui.MUTED, bold = on).apply {
-                    setPadding(0, dp(2), 0, 0)
-                })
+                addView(Ui.text(this@MainActivity, label, 11.5f, if (on) Ui.BLACK else Ui.MUTED, bold = on).apply {
+                    gravity = Gravity.CENTER
+                    setPadding(0, dp(3), 0, 0)
+                }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
                 addView(View(this@MainActivity).apply {
                     background = Ui.circle(if (on) Ui.BLUE_DARK else 0, this@MainActivity)
                     layoutParams = LinearLayout.LayoutParams(dp(5), dp(5)).apply { topMargin = dp(3) }
@@ -123,8 +126,8 @@ class MainActivity : Activity() {
     private fun header(col: LinearLayout, sub: String) {
         val r = Ui.row(this).apply { setPadding(0, dp(6), 0, dp(4)) }
         r.addView(ImageView(this).apply {
-            setImageResource(R.drawable.ic_school)
-            layoutParams = LinearLayout.LayoutParams(dp(50), dp(50)).apply { rightMargin = dp(12) }
+            setImageResource(R.drawable.ic_logo_round)
+            layoutParams = LinearLayout.LayoutParams(dp(48), dp(48)).apply { rightMargin = dp(12) }
         })
         val t = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         t.addView(Ui.text(this, "Hoi, Storm", 20f, bold = true))
@@ -270,7 +273,7 @@ class MainActivity : Activity() {
         // top bar
         val bar = Ui.row(this).apply { setPadding(0, dp(6), 0, dp(4)) }
         bar.addView(ImageView(this).apply {
-            setImageResource(R.drawable.ic_school)
+            setImageResource(R.drawable.ic_logo_round)
             layoutParams = LinearLayout.LayoutParams(dp(44), dp(44))
         })
         bar.addView(Ui.text(this, "Jarvis", 18f, bold = true).apply { gravity = Gravity.CENTER }, Ui.lp(0, weight = 1f))
@@ -278,24 +281,44 @@ class MainActivity : Activity() {
         list.addView(bar)
 
         // blue assistant card
-        val hero = Ui.card(this, Ui.BLUE, 32).apply { gravity = Gravity.CENTER_HORIZONTAL; setPadding(dp(18), dp(10), dp(18), dp(20)) }
+        val hero = Ui.card(this, Ui.BLUE, 32).apply { gravity = Gravity.CENTER_HORIZONTAL; setPadding(dp(16), dp(14), dp(16), dp(18)) }
+        val heroTop = Ui.row(this)
+        heroTop.addView(Ui.text(this, weekLabel.ifEmpty { "Week $week" }.substringBefore(" ·"), 12f, Ui.BLACK, bold = true).apply {
+            background = Ui.shape(this@MainActivity, 0x66FFFFFF, 14)
+            setPadding(dp(12), dp(6), dp(12), dp(6))
+        })
+        heroTop.addView(Ui.spacer(this))
+        heroTop.addView(Ui.roundButton(this, R.drawable.ic_tune, size = 40) { show("settings") }.apply {
+            background = Ui.circle(0x55FFFFFF, this@MainActivity)
+        })
+        hero.addView(heroTop)
         hero.addView(ImageView(this).apply {
             setImageResource(R.drawable.ic_orb)
-            layoutParams = LinearLayout.LayoutParams(dp(130), dp(130))
+            layoutParams = LinearLayout.LayoutParams(dp(180), dp(126)).apply { topMargin = -dp(14) }
         })
-        hero.addView(Ui.text(this, "Hoi Storm! Waarmee kan ik helpen?", 14f, Ui.BLACK).apply {
-            background = Ui.shape(this@MainActivity, Ui.WHITE, 18)
-            setPadding(dp(16), dp(9), dp(16), dp(9))
-        })
-        val actions = Ui.row(this).apply { gravity = Gravity.CENTER; setPadding(0, dp(16), 0, 0) }
-        actions.addView(Ui.roundButton(this, R.drawable.ic_doc, size = 52) { show("scan") })
-        actions.addView(View(this), LinearLayout.LayoutParams(dp(18), 1))
+        hero.addView(Ui.text(this, "Hoi Storm! Waarmee kan ik helpen?", 13f, Ui.BLACK).apply {
+            background = Ui.shape(this@MainActivity, Ui.WHITE, 16)
+            setPadding(dp(14), dp(7), dp(14), dp(7))
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(4) })
+        val actions = Ui.row(this).apply { gravity = Gravity.CENTER; setPadding(0, dp(14), 0, 0) }
+        actions.addView(Ui.roundButton(this, R.drawable.ic_doc, size = 48) { show("scan") })
+        actions.addView(View(this), LinearLayout.LayoutParams(dp(16), 1))
         lateinit var ask: (String) -> Unit
-        actions.addView(Ui.roundButton(this, R.drawable.ic_spark, dark = true, size = 72) { ask("Wat moet ik deze week doen?") })
-        actions.addView(View(this), LinearLayout.LayoutParams(dp(18), 1))
-        actions.addView(Ui.roundButton(this, R.drawable.ic_folder, size = 52) { show("weeks") })
+        actions.addView(FrameLayout(this).apply {      // big black button with a soft ring, like the mic in the design
+            background = Ui.circle(0x33000000, this@MainActivity)
+            addView(Ui.roundButton(this@MainActivity, R.drawable.ic_spark, dark = true, size = 60) { ask("Wat moet ik deze week doen?") }.apply {
+                layoutParams = FrameLayout.LayoutParams(dp(60), dp(60), Gravity.CENTER)
+            })
+        }, LinearLayout.LayoutParams(dp(72), dp(72)))
+        actions.addView(View(this), LinearLayout.LayoutParams(dp(16), 1))
+        actions.addView(Ui.roundButton(this, R.drawable.ic_folder, size = 48) { show("weeks") })
         hero.addView(actions)
         list.addView(hero)
+        val info = Ui.row(this).apply { setPadding(dp(6), dp(10), dp(6), 0) }
+        info.addView(Ui.icon(this, R.drawable.ic_spark, Ui.BLACK, 14))
+        info.addView(Ui.text(this, "  Weet wat je deze week moet doen", 12f, Ui.BLACK, bold = true), Ui.lp(0, weight = 1f))
+        info.addView(Ui.text(this, "Jarvis op je Pi", 12f, Ui.MUTED))
+        list.addView(info)
 
         val sv = ScrollView(this).apply { addView(list) }
         box.addView(sv, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
@@ -323,11 +346,15 @@ class MainActivity : Activity() {
                     "Wat moet ik doen?" to "Wat moet ik doen?", "Toetsen" to "Welke toetsen heb ik de komende dagen?")[label]!!)
             })
         }
-        inputCard.addView(HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; addView(chips) })
-        box.addView(FrameLayout(this).apply {
+        chips.setPadding(0, 0, 0, dp(2))
+        inputCard.addView(HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; addView(chips) },
+            Ui.lp())
+        val inputWrap = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             setPadding(dp(12), dp(6), dp(12), dp(8))
-            addView(inputCard)
-        })
+            addView(inputCard, Ui.lp())
+        }
+        box.addView(inputWrap, Ui.lp())
         content.addView(box)
 
         chatList = list
@@ -351,6 +378,7 @@ class MainActivity : Activity() {
             }
         }
         field.setOnEditorActionListener { _, a, _ -> if (a == EditorInfo.IME_ACTION_SEND) { ask(field.text.toString()); true } else false }
+        pendingAsk?.let { q -> pendingAsk = null; if (Api.hasKey(this)) h.postDelayed({ ask(q) }, 600) }
 
         if (!Api.hasKey(this)) {
             addBubble(JSONObject().put("role", "jarvis").put("text", "Vul eerst het Jarvis-adres en de key in bij Instellen.").put("id", ""))
@@ -359,7 +387,7 @@ class MainActivity : Activity() {
         fetchNew()
     }
 
-    private var firstBubble = 2   // views above the messages: top bar + blue card
+    private var firstBubble = 3   // views above the messages: top bar + blue card + info row
 
     private fun fetchNew() {
         val list = chatList ?: return
@@ -388,7 +416,7 @@ class MainActivity : Activity() {
             layoutParams = Ui.lp(top = dp(10))
         }
         val bubble = TextView(this).apply {
-            text = m.optString("text"); textSize = 15.5f
+            text = m.optString("text"); textSize = 15f; typeface = Ui.REG
             setLineSpacing(0f, 1.15f)
             setTextColor(if (mine) Ui.WHITE else Ui.BLACK)
             setTextIsSelectable(true)
@@ -428,83 +456,129 @@ class MainActivity : Activity() {
         }
     }
 
+    /** Small round icon (white or black circle). */
+    private fun dot(res: Int, fill: Int, tint: Int, size: Int, dashed: Boolean = false) = FrameLayout(this).apply {
+        background = android.graphics.drawable.GradientDrawable().apply {
+            shape = android.graphics.drawable.GradientDrawable.OVAL; setColor(fill)
+            if (dashed) setStroke(dp(1), Ui.MUTED, dp(3).toFloat(), dp(3).toFloat())
+        }
+        if (res != 0) addView(Ui.icon(this@MainActivity, res, tint, size * 9 / 20).apply {
+            layoutParams = FrameLayout.LayoutParams(dp(size * 9 / 20), dp(size * 9 / 20), Gravity.CENTER)
+        })
+        layoutParams = LinearLayout.LayoutParams(dp(size), dp(size))
+    }
+
     private fun fillWeeks(col: LinearLayout, status: TextView, s: JSONObject) {
         week = s.optInt("week", week)
         weekLabel = s.optString("label")
-        status.text = "Nu: $weekLabel" + if (!s.optBoolean("drive")) " · Drive nog niet gekoppeld (PDF's staan op de Pi)" else ""
-
+        status.visibility = View.GONE
         val up = s.optJSONArray("upcoming") ?: JSONArray()
-        val hero = Ui.card(this, Ui.BLUE, 32)
-        val hr = Ui.row(this)
-        hr.addView(Ui.text(this, "Binnenkort", 22f, Ui.BLACK, bold = true), Ui.lp(0, weight = 1f))
-        hr.addView(TextView(this).apply {
-            text = "${up.length()}"; textSize = 15f; typeface = Ui.MEDIUM; setTextColor(Ui.BLACK); gravity = Gravity.CENTER
-            background = Ui.circle(0, this@MainActivity, Ui.BLACK)
-            layoutParams = LinearLayout.LayoutParams(dp(44), dp(44))
-        })
-        hero.addView(hr)
-        if (up.length() == 0) hero.addView(Ui.text(this, "Nog geen toetsen of taken. Scan je planner!", 14f, 0xFF3A3F55.toInt()).apply { setPadding(0, dp(6), 0, 0) })
-        for (i in 0 until minOf(up.length(), 8)) {
-            val it = up.getJSONObject(i)
-            val test = it.optString("kind") == "test"
-            val d = it.optString("date").takeIf { x -> x.isNotEmpty() && x != "null" }?.let { x -> nice(x) } ?: ""
-            val r = Ui.row(this).apply {
-                background = Ui.shape(this@MainActivity, if (test) Ui.BLACK else Ui.WHITE, 22)
-                setPadding(dp(8), dp(8), dp(14), dp(8))
-                layoutParams = Ui.lp(top = dp(8))
-            }
-            r.addView(FrameLayout(this).apply {
-                background = Ui.circle(if (test) Ui.WHITE else Ui.BLACK, this@MainActivity)
-                addView(Ui.icon(this@MainActivity, if (test) R.drawable.ic_cap else R.drawable.ic_doc, if (test) Ui.BLACK else Ui.WHITE, 16).apply {
-                    layoutParams = FrameLayout.LayoutParams(dp(16), dp(16), Gravity.CENTER)
-                })
-            }, LinearLayout.LayoutParams(dp(32), dp(32)).apply { rightMargin = dp(10) })
-            r.addView(Ui.text(this, "${it.optString("subject")}: ${it.optString("what")}", 14f, if (test) Ui.WHITE else Ui.BLACK), Ui.lp(0, weight = 1f))
-            if (d.isNotEmpty()) r.addView(Ui.text(this, d, 12f, if (test) 0xFFB9C6FF.toInt() else Ui.MUTED, bold = true).apply { setPadding(dp(8), 0, 0, 0) })
-            hero.addView(r)
+        val today = LocalDate.now()
+        val monday = today.minusDays((today.dayOfWeek.value - 1).toLong())
+        val items = (0 until up.length()).map { up.getJSONObject(it) }
+
+        // ---- blue roadmap card (like "Check your learning roadmap")
+        val hero = Ui.card(this, Ui.BLUE, 32).apply { gravity = Gravity.CENTER_HORIZONTAL; setPadding(dp(18), dp(22), dp(18), dp(18)) }
+        hero.addView(Ui.text(this, "Check je toetsen en", 22f, Ui.BLACK).apply { gravity = Gravity.CENTER })
+        hero.addView(Ui.text(this, "taken van deze week", 22f, Ui.BLACK, bold = true).apply { gravity = Gravity.CENTER })
+        hero.addView(Ui.text(this, weekLabel, 13f, 0xFF3A3F55.toInt()).apply { gravity = Gravity.CENTER; setPadding(0, dp(4), 0, 0) })
+        val days = Ui.row(this).apply {
+            background = Ui.shape(this@MainActivity, Ui.WHITE, 30)
+            setPadding(dp(10), dp(12), dp(10), dp(12))
+            layoutParams = Ui.lp(top = dp(16))
         }
+        for (i in 0 until 5) {
+            val d = monday.plusDays(i.toLong())
+            val iso = d.toString()
+            val onDay = items.filter { it.optString("date") == iso }
+            val test = onDay.any { it.optString("kind") == "test" }
+            val isToday = d == today
+            val cell = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL }
+            cell.addView(Ui.text(this, listOf("Ma", "Di", "Wo", "Do", "Vr")[i], 13f, Ui.BLACK, bold = isToday).apply { gravity = Gravity.CENTER },
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            val circle = when {
+                isToday -> dot(if (test) R.drawable.ic_cap else if (onDay.isNotEmpty()) R.drawable.ic_doc else R.drawable.ic_spark, Ui.ORANGE, Ui.WHITE, 34)
+                onDay.isNotEmpty() -> dot(if (test) R.drawable.ic_cap else R.drawable.ic_doc, Ui.BLACK, Ui.WHITE, 34)
+                else -> dot(0, 0, 0, 34, dashed = true)
+            }
+            (circle.layoutParams as LinearLayout.LayoutParams).topMargin = dp(8)
+            cell.addView(circle)
+            days.addView(cell, Ui.lp(0, weight = 1f))
+        }
+        hero.addView(days)
         col.addView(hero)
 
-        title(col, "Mappen per week")
-        val colors = listOf(Ui.PINK, Ui.ORANGE, Ui.BLUE_TINT)
+        // ---- "Deze week" rows (like "My courses")
+        val head = Ui.row(this).apply { setPadding(0, dp(22), 0, dp(4)) }
+        head.addView(Ui.text(this, "Binnenkort", 18f, bold = true), Ui.lp(0, weight = 1f))
+        head.addView(Ui.text(this, "${items.size}", 13f, Ui.MUTED, bold = true))
+        col.addView(head)
+        if (items.isEmpty()) col.addView(Ui.text(this, "Nog geen toetsen of taken. Scan je planner, of vertel Jarvis wat je moet doen.", 14f, Ui.MUTED))
+        for ((i, it) in items.take(10).withIndex()) {
+            val test = it.optString("kind") == "test"
+            val first = i == 0
+            val d = it.optString("date").takeIf { x -> x.isNotEmpty() && x != "null" }?.let { x -> nice(x) } ?: "geen datum"
+            val r = Ui.row(this).apply {
+                background = Ui.shape(this@MainActivity, if (first) Ui.BLACK else if (test) Ui.BLUE else Ui.WHITE, 34, if (first || test) 0 else Ui.LINE)
+                setPadding(dp(8), dp(8), dp(8), dp(8))
+                layoutParams = Ui.lp(top = dp(8))
+            }
+            r.addView(dot(if (test) R.drawable.ic_cap else R.drawable.ic_doc, Ui.WHITE, Ui.BLACK, 48).apply {
+                (layoutParams as LinearLayout.LayoutParams).rightMargin = dp(12)
+            })
+            val txt = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            txt.addView(Ui.text(this, (if (test) "Toets " else "") + it.optString("subject").ifEmpty { "Taak" }, 16f, if (first) Ui.WHITE else Ui.BLACK, bold = true))
+            txt.addView(Ui.text(this, "${it.optString("what")} · $d", 13f, if (first) 0xFFB9C0D0.toInt() else 0xFF4A4F60.toInt()).apply { maxLines = 2 })
+            r.addView(txt, Ui.lp(0, weight = 1f))
+            val q = "Vertel me meer over: ${it.optString("subject")} ${it.optString("what")}. Wat moet ik doen en wat zijn de succescriteria?"
+            r.addView(Ui.roundButton(this, R.drawable.ic_arrow, dark = !first, size = 40) { pendingAsk = q; show("chat") }.apply {
+                if (first) background = Ui.circle(0xFF2A2A30.toInt(), this@MainActivity)
+                (getChildAt(0) as ImageView).setColorFilter(Ui.WHITE)
+            })
+            col.addView(r)
+        }
+
+        // ---- week folders (like the colourful course cards)
+        val head2 = Ui.row(this).apply { setPadding(0, dp(24), 0, dp(4)) }
+        head2.addView(Ui.text(this, "Mappen per week", 18f, bold = true), Ui.lp(0, weight = 1f))
+        head2.addView(Ui.text(this, if (s.optBoolean("drive")) "Google Drive" else "op de Pi", 13f, Ui.MUTED, bold = true))
+        col.addView(head2)
+        val strip = Ui.row(this).apply { gravity = Gravity.TOP; setPadding(0, dp(8), 0, dp(4)) }
+        val colors = listOf(Ui.PINK, Ui.ORANGE, Ui.BLUE)
         val weeks = s.optJSONArray("weeks") ?: JSONArray()
         for (i in 0 until weeks.length()) {
             val w = weeks.getJSONObject(i)
             val n = w.optInt("week")
-            val c = Ui.card(this, colors[i % colors.size], 28)
             val docs = w.optJSONArray("docs") ?: JSONArray()
+            val c = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                background = Ui.shape(this@MainActivity, colors[i % colors.size], 28)
+                setPadding(dp(16), dp(16), dp(16), dp(16))
+                minimumHeight = dp(210)
+            }
             val top = Ui.row(this)
-            top.addView(FrameLayout(this).apply {
-                background = Ui.circle(Ui.BLACK, this@MainActivity)
-                addView(Ui.icon(this@MainActivity, R.drawable.ic_folder, Ui.WHITE, 22).apply {
-                    layoutParams = FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER)
-                })
-            }, LinearLayout.LayoutParams(dp(48), dp(48)))
+            top.addView(dot(R.drawable.ic_folder, Ui.BLACK, Ui.WHITE, 46))
             top.addView(Ui.spacer(this))
             top.addView(TextView(this).apply {
-                text = "${docs.length()}"; textSize = 15f; typeface = Ui.MEDIUM; setTextColor(Ui.BLACK); gravity = Gravity.CENTER
+                text = "${docs.length()}"; textSize = 14f; typeface = Ui.SEMI; setTextColor(Ui.BLACK); gravity = Gravity.CENTER
                 background = Ui.circle(0, this@MainActivity, Ui.BLACK)
-                layoutParams = LinearLayout.LayoutParams(dp(44), dp(44))
+                layoutParams = LinearLayout.LayoutParams(dp(40), dp(40))
             })
             c.addView(top)
-            c.addView(Ui.text(this, w.optString("folder"), 19f, Ui.BLACK, bold = true).apply { setPadding(0, dp(12), 0, 0) })
-            if (docs.length() == 0) c.addView(Ui.text(this, "Nog niets gescand", 14f, 0xFF4A4F60.toInt()))
+            c.addView(Ui.text(this, "Week ${"%02d".format(n)}", 19f, Ui.BLACK, bold = true).apply { setPadding(0, dp(14), 0, 0) })
+            c.addView(Ui.text(this, w.optString("label").substringAfter("· "), 13f, 0xFF3A3F55.toInt()))
+            if (docs.length() == 0) c.addView(Ui.text(this, "Nog niets gescand", 13f, 0xFF3A3F55.toInt()).apply { setPadding(0, dp(10), 0, 0) })
             var folderUrl = ""
             for (j in 0 until docs.length()) {
                 val d = docs.getJSONObject(j)
                 val url = d.optString("url").takeIf { it.startsWith("http") } ?: Api.fileUrl(this, n, d.optString("name"))
                 if (folderUrl.isEmpty()) folderUrl = d.optString("folder_url").takeIf { it.startsWith("http") } ?: ""
-                val pagesTxt = d.optInt("pages").let { p -> if (p > 0) "  ·  $p p." else "" }
-                c.addView(Ui.link(this, d.optString("name").removeSuffix(".pdf") + pagesTxt, onWhite = false) { open(url) })
+                c.addView(Ui.link(this, d.optString("name").removeSuffix(".pdf").removeSuffix(" week $n"), onWhite = false) { open(url) })
             }
-            val tests = w.optJSONArray("tests") ?: JSONArray()
-            for (j in 0 until tests.length()) {
-                val t = tests.getJSONObject(j)
-                c.addView(Ui.text(this, "Toets ${t.optString("subject")}: ${t.optString("what")}", 13f, 0xFF3A3F55.toInt()).apply { setPadding(0, dp(6), 0, 0) })
-            }
-            if (folderUrl.isNotEmpty()) c.addView(Ui.pill(this, "OPEN MAP IN DRIVE") { open(folderUrl) })
-            col.addView(c)
+            if (folderUrl.isNotEmpty()) c.addView(Ui.pill(this, "OPEN MAP") { open(folderUrl) })
+            strip.addView(c, LinearLayout.LayoutParams(dp(210), ViewGroup.LayoutParams.WRAP_CONTENT).apply { rightMargin = dp(12) })
         }
+        col.addView(HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; addView(strip) }, Ui.lp())
     }
 
     private fun nice(iso: String): String = runCatching {
