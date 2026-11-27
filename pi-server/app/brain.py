@@ -17,6 +17,8 @@ Geef ALTIJD alleen één JSON-object terug, niets anders:
 Mogelijke acties:
 {"type": "study_start"}   (bij "start study mode", "start studiemodus", "ik wil studeren", "overhoor me"...)
 {"type": "study_update"}  (bij "update study mode", "haal nieuwe leerstof", "update studiemodus")
+{"type": "school"}  (bij vragen over SCHOOL: toetsen, huiswerk, taken, opdrachten, planner, studiewijzer,
+                     "wat moet ik doen voor NW", "ik ben mijn Franse taak vergeten", "overhoor me voor mijn toets")
 {"type": "play_music", "query": "<zoekterm voor YouTube, bv. 'phonk mix'>"}
 {"type": "pause"}   {"type": "resume"}   {"type": "skip"}   {"type": "stop"}
 {"type": "volume", "level": <0-100>}
@@ -29,7 +31,7 @@ Voorbeelden:
 "hoe ver is de maan" -> {"say": "Gemiddeld zo'n 384.000 kilometer.", "action": null}
 """
 
-ACTIONS = {"guard_unlock", "guard_lock", "guard_status", "study_start", "study_update", "home", "music_from", "music_to", "play_music", "pause", "resume", "skip", "stop", "volume", "timer"}
+ACTIONS = {"school", "guard_unlock", "guard_lock", "guard_status", "study_start", "study_update", "home", "music_from", "music_to", "play_music", "pause", "resume", "skip", "stop", "volume", "timer"}
 
 _history: deque = deque(maxlen=8)  # last 4 exchanges
 _client = None

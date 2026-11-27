@@ -137,6 +137,8 @@ class Session:
         self.silent_turns = 0
         self.misses = 0
         self.fallback_subject = None  # no Storm Study data: bundled txt + AI
+        self.material = None          # school quiz: success criteria from the project site
+        self.missed: list = []        # questions answered wrong this session
 
     def label(self) -> str:
         return self.label_text or "?"
@@ -405,13 +407,18 @@ class Session:
         """Fallback without Storm Study: AI questions from the bundled leerstof."""
         files = {"nw": "nw.txt", "hb": "hb.txt", "frans": "frans.txt"}
         material = ""
-        if self.fallback_subject in files:
+        if self.material:
+            material = self.material[:12000]
+            k = max(k, min(self.total or 10, 15))
+        elif self.fallback_subject in files:
             with open(os.path.join(HERE, files[self.fallback_subject]), encoding="utf-8") as f:
                 material = f.read()[:12000]
         try:
             raw = brain._chat([{"role": "system", "content": "Je maakt quizvragen. Antwoord alleen met een JSON-lijst."},
                                {"role": "user", "content":
-                                f"Maak {k} korte quizvragen (om voor te lezen) uit deze leerstof:\n<<<\n{material}\n>>>\n"
+                                f"Maak {k} korte quizvragen (om voor te lezen) uit deze leerstof"
+                                + (" en succescriteria. Elke vraag toetst een ander succescriterium" if self.material else "")
+                                + f":\n<<<\n{material}\n>>>\n"
                                 'Formaat: [{"q": "...", "a": "<kort antwoord>"}]'}], max_tokens=1500, temperature=0.8)
             items = json.loads(re.search(r"\[.*\]", raw, re.S).group(0))
         except Exception:
@@ -551,6 +558,7 @@ class Session:
                 msg += f" {self.streak} na elkaar, bonus van 25 punten!"
         else:
             self.streak = 0
+            self.missed.append({"q": q["q"], "a": q["a"]})
             msg = f"Helaas. Het juiste antwoord is: {self._say(q['a'], q)}."
         return msg
 
@@ -559,6 +567,9 @@ class Session:
             return (prefix + "Tot de volgende keer!").strip()
         r = self.correct / self.answered
         cheer = " Topscore!" if r >= 0.9 else " Goed bezig!" if r >= 0.6 else " Nog even oefenen, je kan het!"
+        if self.material:
+            cheer = (" Alles juist, je bent klaar voor je toets!" if self.correct == self.answered
+                     else " Je fouten zet ik in de app, die oefenen we morgen nog eens.")
         time.sleep(0.4)      # let the last answer reach Storm Study first
         pts = storm_study.points()
         extra = f" Je staat nu op {pts} punten op Storm Study." if pts is not None else ""
@@ -579,6 +590,16 @@ class Session:
             self.step = "pick"
             return "Studiemodus aan! " + self._menu()
         return "Studiemodus aan. " + self._next_prompt()
+
+    def start_school(self, label: str, material: str, total: int = 10, french: bool = False) -> str:
+        """Quiz from the project site's success criteria (school buddy)."""
+        self.__init__()
+        self.active = True
+        self.material = material
+        self.fallback_subject = "frans" if french else "school"
+        self.label_text = label
+        self.game, self.total, self.count_set = "mix", total, True
+        return "Oké! " + self._begin()
 
     def stop(self) -> str:
         msg = self._summary()

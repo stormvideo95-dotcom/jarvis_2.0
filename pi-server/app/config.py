@@ -41,3 +41,14 @@ MUSIC_AI_URL = _env("MUSIC_AI_URL", "http://127.0.0.1:8765")
 # Storm Study (study.ictstorm.com): leerstof + your mistakes/points for study mode
 STUDY_URL = _env("STUDY_URL", "https://study.ictstorm.com")
 STUDY_JARVIS_TOKEN = _env("STUDY_JARVIS_TOKEN", "")   # starts with jv_, keep it only in .env
+
+# School buddy (Jarvis School app + LAB project site)
+SCHOOL_SITE = _env("SCHOOL_SITE", "https://sites.google.com/labonderwijs.be/humanbody/homepage")
+SCHOOL_ROUTE = _env("SCHOOL_ROUTE", "z")              # NW route on the project site: g, b or z
+SCHOOL_WEEK1 = _env("SCHOOL_WEEK1", "2026-11-09")     # Monday of project week 1
+SCHOOL_REMIND = _env("SCHOOL_REMIND", "19:00")         # evening-before-a-test reminder
+SCHOOL_PLANNER_REMIND = _env("SCHOOL_PLANNER_REMIND", "18:00")  # Monday: "scan your planner"
+VISION_MODEL = _env("VISION_MODEL", "")               # NVIDIA model that reads the scans (auto when empty)
+# Google Drive: the Apps Script web app on storm.video95@gmail.com (see school-drive/README.md)
+DRIVE_SCRIPT_URL = _env("DRIVE_SCRIPT_URL", "")
+DRIVE_SECRET = _env("DRIVE_SECRET", "")

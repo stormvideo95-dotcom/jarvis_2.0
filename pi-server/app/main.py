@@ -18,7 +18,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import brain, config, guard, ha, music, musicsync, settings, storm_study, study, stt, tts
+from . import brain, config, guard, ha, music, musicsync, school, settings, storm_study, study, stt, tts
 from .wake import WakeListener
 from .nest import Nest
 
@@ -87,11 +87,22 @@ def study_say(text: str):
         say(text)
 
 
+def _after_study():
+    """School quiz finished: put the score and the mistakes in the app chat."""
+    s = study.session
+    if not s.active and s.material and not getattr(s, "_reported", False):
+        s._reported = True
+        school.quiz_done(s.missed, s.correct, s.answered)
+
+
 def _study_silence():
     if study.session.active:
         study_say(study.session.silence())
+        _after_study()
     elif guard.pending:
         guard.pending.clear()
+    elif school.pending:
+        school.pending.clear()
 
 
 def _study_stopped_by_voice():
@@ -100,6 +111,7 @@ def _study_stopped_by_voice():
         study_wait.clear()
         time.sleep(0.6)
         say(study.session.stop())
+        _after_study()
 
 
 def _play_tracks(tracks: list, start_ms: int = 0):
@@ -197,7 +209,25 @@ def _guard_reply(answer: str, wait: bool, text: str, action: str) -> dict:
 _UNLOCK_WORDS = r"\b(unlock|ontgrendel|ontgrendelen|open|openen|vrijgeven|mag ik|kan ik|scrollen|scroll|deblokkeer)\b"
 
 
+def _start_school_quiz(text: str, quiz: dict) -> dict:
+    if not quiz.get("material"):
+        answer = "Ik vond geen succescriteria op de projectsite. Zeg start study mode om met Storm Study te oefenen."
+        say(answer)
+        return _entry(text, answer, "school")
+    answer = study.session.start_school(quiz["label"], quiz["material"], 10, quiz.get("french", False))
+    study_say(answer)
+    _after_study()
+    return _entry(text, answer, "school_quiz")
+
+
 def handle_text(text: str) -> dict:
+    if school.pending and not study.session.active:
+        res = school.answer_pending(text)
+        if res:
+            if res["quiz"]:
+                return _start_school_quiz(text, res["quiz"])
+            say(res["say"])
+            return _entry(text, res["say"], "school")
     if guard.pending and not study.session.active:
         res = guard.answer_pending(text)
         if res:
@@ -222,6 +252,7 @@ def handle_text(text: str) -> dict:
     if study.session.active:
         answer = study.session.handle(text)
         study_say(answer)
+        _after_study()
         entry = {"time": time.strftime("%H:%M:%S"), "heard": text, "said": study.clean(answer), "action": "study"}
         history.appendleft(entry)
         return entry
@@ -252,6 +283,13 @@ def handle_text(text: str) -> dict:
     elif kind == "study_start":
         reply["say"] = study.session.start(text)
         study_say(reply["say"])
+    elif kind == "school":
+        res = school.ask(text, voice=True)
+        if res.get("quiz"):
+            say(res["text"], then=lambda: _start_school_quiz(text, school.quiz_for(res["quiz"])))
+        else:
+            say(res["text"])
+        reply["say"] = res["text"]
     elif kind == "study_update":
         say("Even kijken op Storm Study.")
         reply["say"] = storm_study.update()
@@ -349,6 +387,11 @@ wake = WakeListener(_on_wake_command, on_wake=_on_wake,
                     talking=lambda: nest.talking(), on_stop=_study_stopped_by_voice,
                     transcribe=lambda pcm, rate: stt.transcribe(pcm, rate),
                     expect=study_wait, on_silence=_study_silence)
+
+
+@app.on_event("startup")
+def _start_school():
+    school.start_reminders(say, listen_say)
 
 
 @app.on_event("startup")
@@ -492,6 +535,58 @@ def guard_blocked(app_name: str = ""):
     return (Path(__file__).parent / "blocked.html").read_text(encoding="utf-8")
 
 
+class TextIn(BaseModel):
+    text: str
+
+
+# ---- Jarvis School app ----------------------------------------------------------
+@app.get("/api/school/state")
+def school_state(x_jarvis_key: str = Header(default="")):
+    _check_key(x_jarvis_key)
+    return school.state()
+
+
+@app.get("/api/school/chat")
+def school_chat_history(after: str = "", x_jarvis_key: str = Header(default="")):
+    _check_key(x_jarvis_key)
+    return school.chat_history(after)
+
+
+@app.post("/api/school/chat")
+async def school_chat(msg: TextIn, x_jarvis_key: str = Header(default="")):
+    _check_key(x_jarvis_key)
+    text = msg.text.strip()[:2000]
+    if not text:
+        raise HTTPException(status_code=400, detail="empty")
+    return await run_in_threadpool(school.ask, text)
+
+
+class UploadIn(BaseModel):
+    kind: str
+    week: int | None = None
+    pdf: str
+    pages: list[str] = []
+
+
+@app.post("/api/school/upload")
+async def school_upload(body: UploadIn, x_jarvis_key: str = Header(default="")):
+    _check_key(x_jarvis_key)
+    try:
+        return await run_in_threadpool(school.upload, body.kind, body.week, body.pdf, body.pages)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/school/file")
+def school_file(week: int, name: str, key: str = ""):
+    _check_key(key)
+    from fastapi.responses import FileResponse
+    path = school.file_path(week, name)
+    if not path:
+        raise HTTPException(status_code=404, detail="not found")
+    return FileResponse(path, media_type="application/pdf", filename=os.path.basename(path))
+
+
 @app.get("/api/settings")
 def get_settings():
     return {**settings.get(), "wake_words": settings.WAKE_WORDS}
@@ -503,10 +598,6 @@ async def set_settings(request: Request, x_jarvis_key: str = Header(default=""))
     cfg = settings.update(await request.json())
     board["log"].appendleft(f"{time.strftime('%H:%M:%S')} settings: {cfg['mode']}, {cfg['wake_word']}")
     return {**cfg, "wake_words": settings.WAKE_WORDS}
-
-
-class TextIn(BaseModel):
-    text: str
 
 
 @app.post("/api/text")
@@ -530,6 +621,7 @@ def health():
                        "answered": study.session.answered, "correct": study.session.correct}
                       if study.session.active else None),
             "storm_study": storm_study.status(),
+            "school": school.status(),
             "guard": {k: v for k, v in guard.status().items() if k != "apps"},
             "nest": (lambda s: s["name"] or s["ip"] or "auto")(nest.chosen())}
 

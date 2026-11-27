@@ -100,6 +100,34 @@ if [ -z "$(grep '^HA_TOKEN=' .env | cut -d= -f2-)" ] && [ ! -f data/.ha_skipped 
   fi
 fi
 
+# ---- School buddy + Google Drive (asked once) ----
+if ! grep -q '^SCHOOL_SITE=' .env; then
+  printf '\n# School buddy (Jarvis School app)\nSCHOOL_SITE=https://sites.google.com/labonderwijs.be/humanbody/homepage\nSCHOOL_ROUTE=z\nSCHOOL_WEEK1=2026-11-09\nSCHOOL_REMIND=19:00\nSCHOOL_PLANNER_REMIND=18:00\n' >> .env
+fi
+if ! grep -q '^DRIVE_SECRET=' .env; then
+  DSECRET=$(head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 24)
+  printf '\n# Google Drive saver (school-drive/README.md)\nDRIVE_SCRIPT_URL=\nDRIVE_SECRET=%s\n' "$DSECRET" >> .env
+fi
+if [ -z "$(grep '^DRIVE_SCRIPT_URL=' .env | cut -d= -f2-)" ] && [ ! -f data/.drive_skipped ]; then
+  say "Connect Google Drive for Jarvis School (optional)"
+  echo "Follow https://github.com/$REPO/blob/main/school-drive/README.md"
+  echo "Your DRIVE_SECRET (paste it in the script):  $(grep '^DRIVE_SECRET=' .env | cut -d= -f2-)"
+  printf "Paste the Web app URL (ends in /exec), or press Enter to skip: " > $TTY
+  read -r DURL < $TTY
+  if [ -n "$DURL" ]; then
+    sed -i "s#^DRIVE_SCRIPT_URL=.*#DRIVE_SCRIPT_URL=$DURL#" .env
+    DS=$(grep '^DRIVE_SECRET=' .env | cut -d= -f2-)
+    if curl -fsSL -m 20 -H 'Content-Type: application/json' -d "{\"action\":\"ping\",\"secret\":\"$DS\"}" "$DURL" | grep -q '"ok":true'; then
+      ok "Google Drive connected (folder: Jarvis School)"
+    else
+      echo "Saved, but the script did not say ok. Check the SECRET in the script and that it is deployed for 'Anyone'."
+    fi
+  else
+    touch data/.drive_skipped
+    echo "Skipped. Scans stay on the Pi. To add it later: rm $DIR/data/.drive_skipped and run this install again."
+  fi
+fi
+
 say "Building and starting Jarvis (first time takes a few minutes)"
 $DOCKER compose up -d --build
 ok "Jarvis is running"
