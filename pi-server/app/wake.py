@@ -149,9 +149,6 @@ class WakeListener:
                 log.debug("stop check failed", exc_info=True)
             finally:
                 self._stop_busy = False
-        self.expect = expect            # threading.Event: Jarvis asked something, record the answer
-        self.on_silence = on_silence    # called when no answer came
-        self._answer_mode = False
         threading.Thread(target=check, daemon=True).start()
 
     def _start_answer(self):
