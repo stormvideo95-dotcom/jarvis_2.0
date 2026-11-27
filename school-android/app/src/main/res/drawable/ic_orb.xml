@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Soft glowing orb for Jarvis (like the AI assistant blob in the design) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="160dp" android:height="160dp" android:viewportWidth="160" android:viewportHeight="160">
+    <path android:fillColor="#33FFFFFF" android:pathData="M80,14c34,0 62,26 62,62s-30,70 -66,68c-34,-2 -60,-30 -58,-66c2,-34 28,-64 62,-64z" />
+    <path android:fillColor="#00000000" android:strokeColor="#CCFFFFFF" android:strokeWidth="5"
+        android:pathData="M82,30c26,2 46,22 44,48c-2,26 -26,48 -52,44c-24,-4 -42,-26 -38,-50c4,-24 22,-44 46,-42z" />
+    <path android:fillColor="#00000000" android:strokeColor="#99FFFFFF" android:strokeWidth="3"
+        android:pathData="M60,44c20,-12 50,-4 58,18c8,22 -6,46 -30,50c-22,4 -42,-12 -42,-34c0,-14 4,-26 14,-34z" />
+    <path android:fillColor="#E6FFFFFF" android:pathData="M64,52c10,-6 26,-4 32,6c6,10 -2,22 -14,24c-12,2 -24,-6 -24,-16c0,-6 2,-11 6,-14z" />
+</vector>
