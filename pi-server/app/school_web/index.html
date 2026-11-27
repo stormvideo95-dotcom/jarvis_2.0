@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jarvis School</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Ccircle cx='24' cy='24' r='24' fill='%230F0F12'/%3E%3Cpath fill='white' transform='translate(10.8 10.8) scale(1.1)' d='M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82zM12 3L1 9l11 6 9-4.91V17h2V9L12 3z'/%3E%3C/svg%3E">
+<style>
+:root{--bg:#F6F7FA;--white:#fff;--soft:#EFF1F5;--line:#E4E7EE;--blue:#88A7FF;--blue-dark:#5F7FE8;--tint:#E5EBFF;--pink:#E7A6F5;--orange:#F39A35;--black:#0F0F12;--muted:#8A8F9C;--sub:#3A3F55}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--black);font-family:Outfit,system-ui,sans-serif}
+button,input,textarea{font:inherit;color:inherit}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 20px 40px}
+header{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+header .t{flex:1}
+header h1{margin:0;font-size:20px;font-weight:600}
+header p{margin:0;color:var(--muted);font-size:13px}
+.round{width:46px;height:46px;border-radius:50%;border:1px solid var(--line);background:var(--white);color:var(--black);display:grid;place-items:center;cursor:pointer;flex:none}
+.round.dark{background:var(--black);border:0;color:#fff}
+.round svg{width:20px;height:20px}
+.grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:880px){.grid{grid-template-columns:1fr}}
+.card{background:var(--white);border:1px solid var(--line);border-radius:28px;padding:18px 20px}
+.blue{background:var(--blue);border:0}
+/* chat */
+.chat{display:flex;flex-direction:column;height:calc(100vh - 110px);min-height:560px;padding:14px}
+@media (max-width:880px){.chat{height:auto;min-height:0}}
+.hero{border-radius:28px;background:var(--blue);padding:14px 16px 16px;text-align:center;position:relative}
+.hero .top{display:flex;justify-content:space-between;align-items:center}
+.chipw{background:rgba(255,255,255,.4);border-radius:14px;padding:5px 12px;font-size:12px;font-weight:600}
+.hero svg.orb{width:170px;height:118px;margin:-8px auto 0;display:block}
+.hello{display:inline-block;background:#fff;border-radius:16px;padding:7px 14px;font-size:13px}
+.acts{display:flex;gap:16px;justify-content:center;align-items:center;margin-top:14px}
+.ring{width:70px;height:70px;border-radius:50%;background:rgba(0,0,0,.2);display:grid;place-items:center}
+.ring .round{width:58px;height:58px}
+.msgs{flex:1;overflow-y:auto;padding:10px 4px;display:flex;flex-direction:column;gap:10px}
+@media (max-width:880px){.msgs{max-height:60vh}}
+.m{max-width:80%;padding:11px 16px;border-radius:22px;white-space:pre-wrap;line-height:1.4;font-size:15px}
+.m.me{align-self:flex-end;background:var(--black);color:#fff}
+.m.j{align-self:flex-start;background:#fff;border:1px solid var(--line)}
+.links{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin-top:-4px}
+.link{display:inline-flex;align-items:center;gap:10px;background:var(--tint);border-radius:22px;padding:6px 16px 6px 6px;font-weight:600;font-size:13px;text-decoration:none;color:var(--black)}
+.link i{width:28px;height:28px;border-radius:50%;background:var(--black);display:grid;place-items:center}
+.link i svg{width:14px;height:14px}
+.input{border:1px solid var(--line);border-radius:26px;padding:8px 10px 10px 16px;background:#fff}
+.input .row{display:flex;align-items:center;gap:8px}
+.input textarea{flex:1;border:0;outline:0;resize:none;height:40px;max-height:120px;padding:9px 0;font-size:15px;background:transparent}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.chip{border:0;border-radius:20px;padding:8px 14px;background:var(--soft);font-weight:500;font-size:13px;cursor:pointer}
+.chip.on{background:var(--black);color:#fff}
+/* side */
+.side{display:flex;flex-direction:column;gap:16px}
+.roadmap{text-align:center}
+.roadmap img{width:100%;max-height:190px;object-fit:contain;display:block}
+.roadmap h2{margin:6px 0 0;font-size:22px;font-weight:400}
+.roadmap h2 b{font-weight:600}
+.days{display:flex;background:#fff;border-radius:30px;padding:12px 10px;margin-top:14px}
+.day{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;font-size:13px}
+.dot{width:34px;height:34px;border-radius:50%;display:grid;place-items:center}
+.dot svg{width:16px;height:16px}
+.dot.empty{border:1.5px dashed var(--muted)}
+h3{margin:4px 2px 0;font-size:18px;font-weight:600;display:flex;justify-content:space-between}
+h3 span{font-size:13px;color:var(--muted)}
+.item{display:flex;align-items:center;gap:12px;border-radius:34px;padding:8px;background:#fff;border:1px solid var(--line)}
+.item.first{background:var(--black);color:#fff;border:0}
+.item.test{background:var(--blue);border:0}
+.item .ic{width:46px;height:46px;border-radius:50%;background:#fff;display:grid;place-items:center;flex:none}
+.item .ic svg{width:20px;height:20px}
+.item .tx{flex:1;min-width:0}
+.item .tx b{display:block;font-weight:600}
+.item .tx small{color:#4A4F60;font-size:13px}
+.item.first .tx small{color:#B9C0D0}
+.item .go{width:40px;height:40px;border-radius:50%;background:var(--black);border:0;display:grid;place-items:center;cursor:pointer;flex:none}
+.item.first .go{background:#2A2A30}
+.item .go svg{width:16px;height:16px}
+.weeks{display:flex;gap:12px;overflow-x:auto;padding-bottom:6px}
+.wk{min-width:210px;border-radius:28px;padding:16px;display:flex;flex-direction:column;gap:6px}
+.wk .top{display:flex;justify-content:space-between;align-items:center}
+.wk .cnt{width:40px;height:40px;border-radius:50%;border:1.5px solid var(--black);display:grid;place-items:center;font-weight:600}
+.wk h4{margin:8px 0 0;font-size:19px;font-weight:600}
+.wk p{margin:0 0 4px;color:var(--sub);font-size:13px}
+.wk .link{background:#fff}
+.pill{display:inline-block;background:var(--black);color:#fff;border:0;border-radius:28px;padding:12px 20px;font-weight:600;font-size:13px;letter-spacing:.04em;cursor:pointer;text-decoration:none}
+.upload{text-align:center}
+.upload img{width:100%;max-height:170px;object-fit:contain}
+.upload h4{margin:4px 0 2px;font-size:18px;font-weight:600}
+.upload p{margin:0 0 6px;font-size:13px;color:var(--sub)}
+.seg{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:8px 0}
+.status{font-size:13px;color:var(--sub);min-height:18px;margin-top:6px}
+/* login */
+.login{max-width:420px;margin:8vh auto;text-align:center}
+.login img{width:100%;border-radius:22px}
+.login input{width:100%;border:1px solid var(--line);border-radius:18px;padding:14px 16px;margin-top:10px;background:#fff}
+.err{color:#B3261E;font-size:13px;margin-top:8px;min-height:16px}
+.hide{display:none!important}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="cap" viewBox="0 0 24 24"><path fill="currentColor" d="M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82zM12 3L1 9l11 6 9-4.91V17h2V9L12 3z"/></symbol>
+  <symbol id="doc" viewBox="0 0 24 24"><path fill="currentColor" d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></symbol>
+  <symbol id="folder" viewBox="0 0 24 24"><path fill="currentColor" d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></symbol>
+  <symbol id="send" viewBox="0 0 24 24"><path fill="currentColor" d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></symbol>
+  <symbol id="arrow" viewBox="0 0 24 24"><path fill="currentColor" d="M9 5v2h6.59L4 18.59 5.41 20 17 8.41V15h2V5z"/></symbol>
+  <symbol id="spark" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2l2.2 6.8L21 11l-6.8 2.2L12 20l-2.2-6.8L3 11l6.8-2.2z"/></symbol>
+  <symbol id="out" viewBox="0 0 24 24"><path fill="currentColor" d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></symbol>
+</svg>
+
+<!-- login -->
+<div id="login" class="wrap hide">
+  <div class="login card blue">
+    <img src="/school/ill_connect.webp" alt="">
+    <h1 style="margin:8px 0 2px;font-weight:600">Jarvis School</h1>
+    <p style="margin:0;color:var(--sub)">Vul je Jarvis key in (JARVIS_KEY)</p>
+    <input id="key" type="password" placeholder="JARVIS_KEY" autocomplete="current-password">
+    <div class="err" id="loginErr"></div>
+    <button class="pill" id="loginBtn" style="margin-top:6px;width:100%">VERBINDEN</button>
+  </div>
+</div>
+
+<!-- app -->
+<div id="app" class="wrap hide">
+  <header>
+    <svg width="46" height="46" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="24" fill="#0F0F12"/><path fill="#fff" transform="translate(10.8 10.8) scale(1.1)" d="M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82zM12 3L1 9l11 6 9-4.91V17h2V9L12 3z"/><circle cx="39" cy="8" r="5" fill="#F39A35" stroke="#F6F7FA" stroke-width="2"/></svg>
+    <div class="t"><h1>Hoi, Storm</h1><p id="weekLabel">Jarvis School</p></div>
+    <button class="round" id="logout" title="Uitloggen"><svg><use href="#out"/></svg></button>
+  </header>
+
+  <div class="grid">
+    <section class="card chat">
+      <div class="hero">
+        <div class="top"><span class="chipw" id="weekChip">Week</span><span class="chipw">Jarvis op je Pi</span></div>
+        <svg class="orb" viewBox="0 0 200 150" aria-hidden="true">
+          <g fill="#fff"><circle cx="18" cy="42" r="2.5" opacity=".7"/><circle cx="36" cy="102" r="2" opacity=".5"/><circle cx="170" cy="33" r="3" opacity=".6"/><circle cx="182" cy="94" r="2" opacity=".5"/><circle cx="150" cy="130" r="2" opacity=".4"/><circle cx="48" cy="19.6" r="1.6" opacity=".4"/>
+          <path d="M160 60l1.6 4.4 4.4 1.6-4.4 1.6-1.6 4.4-1.6-4.4-4.4-1.6 4.4-1.6z" opacity=".9"/><path d="M30 70l1.2 3.3 3.3 1.2-3.3 1.2-1.2 3.3-1.2-3.3-3.3-1.2 3.3-1.2z" opacity=".8"/>
+          <path d="M100 14c34 0 58 24 56 58s-28 62-60 60-54-30-52-62 24-56 56-56z" opacity=".15"/></g>
+          <g fill="none" stroke="#fff" stroke-linecap="round">
+          <path d="M64 70c0-26 22-44 46-40 22 4 34 24 30 44-4 22-26 38-48 34-20-4-28-20-24-34 4-14 18-22 32-18" stroke-width="7" opacity=".9"/>
+          <path d="M78 40c18-12 46-8 58 12s4 46-18 56-48-2-54-24c-4-16 4-30 18-34" stroke-width="4" opacity=".7"/>
+          <path d="M120 34c18 8 26 30 18 48s-32 28-50 20c-16-8-22-26-14-40" stroke-width="3" opacity=".5"/>
+          <path d="M86 58c8-10 26-10 32 2s-2 26-16 26c-10 0-18-8-16-18" stroke-width="2.5"/></g>
+        </svg>
+        <div class="hello">Hoi Storm! Waarmee kan ik helpen?</div>
+        <div class="acts">
+          <a class="round" href="#upload" title="Planner uploaden"><svg><use href="#doc"/></svg></a>
+          <div class="ring"><button class="round dark" data-ask="Wat moet ik deze week doen?" title="Wat moet ik doen?"><svg><use href="#spark"/></svg></button></div>
+          <a class="round" href="#weeks" title="Weken"><svg><use href="#folder"/></svg></a>
+        </div>
+      </div>
+      <div class="msgs" id="msgs" aria-live="polite"></div>
+      <div class="input">
+        <div class="row">
+          <textarea id="text" placeholder="Vraag me iets…" rows="1"></textarea>
+          <button class="round dark" id="send" title="Versturen"><svg><use href="#send"/></svg></button>
+        </div>
+        <div class="chips">
+          <button class="chip on" data-ask="Geef me een overzicht van deze week">Weekoverzicht</button>
+          <button class="chip" data-ask="Wat moet ik doen?">Wat moet ik doen?</button>
+          <button class="chip" data-ask="Welke toetsen heb ik de komende dagen?">Toetsen</button>
+          <button class="chip" id="forgot">Ik ben iets vergeten</button>
+        </div>
+      </div>
+    </section>
+
+    <aside class="side">
+      <div class="card blue roadmap">
+        <img src="/school/ill_week.webp" alt="">
+        <h2>Check je toetsen en<br><b>taken van deze week</b></h2>
+        <div class="days" id="days"></div>
+      </div>
+      <h3>Binnenkort <span id="count"></span></h3>
+      <div id="items" class="side" style="gap:8px"></div>
+
+      <div class="card blue upload" id="upload">
+        <img src="/school/ill_scan.webp" alt="">
+        <h4>Upload je planner of studiewijzer</h4>
+        <p>Een PDF of foto's. Jarvis bewaart het in Drive en leest je toetsen.</p>
+        <div class="seg" id="kinds">
+          <button class="chip on" data-kind="planner">Planner</button>
+          <button class="chip" data-kind="studiewijzer">Studiewijzer</button>
+          <button class="chip" data-kind="andere">Andere</button>
+        </div>
+        <div class="seg"><button class="chip" id="wkMinus">−</button><span class="chip on" id="wkVal">Week</span><button class="chip" id="wkPlus">+</button></div>
+        <input type="file" id="file" accept="application/pdf,image/*" multiple class="hide">
+        <button class="pill" id="pick">KIES BESTAND</button>
+        <div class="status" id="upStatus"></div>
+      </div>
+
+      <h3 id="weeks">Mappen per week <span id="driveTag"></span></h3>
+      <div class="weeks" id="weekCards"></div>
+    </aside>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const store = { get(k){ try { return localStorage.getItem(k) || ''; } catch(e){ return ''; } },
+                set(k,v){ try { localStorage.setItem(k,v); } catch(e){} }, del(k){ try { localStorage.removeItem(k); } catch(e){} } };
+let KEY = store.get('jarvisKey'), lastId = '', sending = false, week = 0, kind = 'planner';
+const DAYS = ['Ma','Di','Wo','Do','Vr'];
+const icon = n => `<svg><use href="#${n}"/></svg>`;
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, { ...opts, headers: { 'X-Jarvis-Key': KEY, 'Content-Type': 'application/json', ...(opts.headers || {}) } });
+  if (r.status === 401) { logout('Verkeerde key'); throw new Error('key'); }
+  if (!r.ok) throw new Error('Jarvis gaf ' + r.status);
+  return r.json();
+}
+
+function logout(msg) { KEY = ''; store.del('jarvisKey'); $('#app').classList.add('hide'); $('#login').classList.remove('hide'); $('#loginErr').textContent = msg || ''; }
+
+$('#loginBtn').onclick = async () => {
+  KEY = $('#key').value.trim(); if (!KEY) return;
+  try { await api('/api/school/state'); store.set('jarvisKey', KEY); start(); }
+  catch (e) { if (e.message !== 'key') $('#loginErr').textContent = 'Jarvis niet bereikbaar'; }
+};
+$('#key').addEventListener('keydown', e => { if (e.key === 'Enter') $('#loginBtn').click(); });
+$('#logout').onclick = () => logout();
+
+// ---- chat
+function bubble(m) {
+  const box = $('#msgs');
+  const d = document.createElement('div');
+  d.className = 'm ' + (m.role === 'storm' ? 'me' : 'j');
+  d.textContent = m.text;
+  box.appendChild(d);
+  if (m.buttons && m.buttons.length) {
+    const l = document.createElement('div'); l.className = 'links';
+    for (const b of m.buttons) {
+      if (!/^https?:\/\//.test(b.url)) continue;
+      const a = document.createElement('a'); a.className = 'link'; a.href = b.url; a.target = '_blank'; a.rel = 'noopener';
+      a.innerHTML = `<i style="color:#fff">${icon('arrow')}</i>`; a.appendChild(document.createTextNode(b.label));
+      l.appendChild(a);
+    }
+    box.appendChild(l);
+  }
+  box.scrollTop = box.scrollHeight;
+  return d;
+}
+
+async function fetchNew() {
+  if (sending || !KEY) return;
+  try {
+    const msgs = await api('/api/school/chat?after=' + encodeURIComponent(lastId));
+    if (!lastId) $('#msgs').innerHTML = '';
+    for (const m of msgs) { bubble(m); lastId = m.id; }
+  } catch (e) {}
+}
+
+async function ask(text) {
+  text = (text || '').trim(); if (!text || sending) return;
+  sending = true; $('#text').value = '';
+  bubble({ role: 'storm', text });
+  const typing = bubble({ role: 'jarvis', text: 'Jarvis denkt na…' });
+  try { await api('/api/school/chat', { method: 'POST', body: JSON.stringify({ text }) }); }
+  catch (e) { typing.textContent = 'Jarvis is niet bereikbaar. Probeer zo opnieuw.'; sending = false; return; }
+  typing.remove(); sending = false;
+  lastId = ''; await fetchNew(); loadState();   // redraw from the Pi so nothing shows twice
+}
+$('#send').onclick = () => ask($('#text').value);
+$('#text').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask($('#text').value); } });
+document.querySelectorAll('[data-ask]').forEach(b => b.onclick = () => ask(b.dataset.ask));
+$('#forgot').onclick = () => { const t = $('#text'); t.value = 'Ik ben vergeten: '; t.focus(); };
+
+// ---- side panel
+function nice(iso) {
+  if (!iso) return 'geen datum';
+  const d = new Date(iso + 'T12:00'), t = new Date(); t.setHours(12,0,0,0);
+  const diff = Math.round((d - t) / 864e5);
+  if (diff === 0) return 'vandaag'; if (diff === 1) return 'morgen';
+  return ['zo','ma','di','wo','do','vr','za'][d.getDay()] + ' ' + d.getDate() + '/' + (d.getMonth() + 1);
+}
+function isoDay(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+
+async function loadState() {
+  let s; try { s = await api('/api/school/state'); } catch (e) { return; }
+  if (!week) week = s.week;
+  $('#weekLabel').textContent = s.label; $('#weekChip').textContent = 'Week ' + s.week; $('#wkVal').textContent = 'Week ' + week;
+  $('#driveTag').textContent = s.drive ? 'Google Drive' : 'op de Pi';
+  const items = s.upcoming || [];
+  // days
+  const today = new Date(); const mon = new Date(today); mon.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+  $('#days').innerHTML = DAYS.map((n, i) => {
+    const d = new Date(mon); d.setDate(mon.getDate() + i); const iso = isoDay(d);
+    const on = items.filter(x => x.date === iso), test = on.some(x => x.kind === 'test'), isToday = iso === isoDay(today);
+    const ic = test ? 'cap' : on.length ? 'doc' : 'spark';
+    const dot = isToday ? `<span class="dot" style="background:var(--orange);color:#fff">${icon(ic)}</span>`
+      : on.length ? `<span class="dot" style="background:var(--black);color:#fff">${icon(ic)}</span>` : `<span class="dot empty"></span>`;
+    return `<div class="day"${isToday ? ' style="font-weight:600"' : ''}>${n}${dot}</div>`;
+  }).join('');
+  // items
+  $('#count').textContent = items.length;
+  const box = $('#items'); box.innerHTML = '';
+  if (!items.length) {
+    box.innerHTML = `<div class="card blue upload"><img src="/school/ill_relax.webp" alt=""><h4>Niets op de planning!</h4><p>Upload je planner, of vertel Jarvis wat je moet doen.</p></div>`;
+  }
+  items.slice(0, 10).forEach((it, i) => {
+    const test = it.kind === 'test';
+    const row = document.createElement('div');
+    row.className = 'item' + (i === 0 ? ' first' : test ? ' test' : '');
+    row.innerHTML = `<span class="ic" style="color:#0F0F12">${icon(test ? 'cap' : 'doc')}</span><div class="tx"><b></b><small></small></div><button class="go" style="color:#fff" title="Vraag Jarvis">${icon('arrow')}</button>`;
+    row.querySelector('b').textContent = (test ? 'Toets ' : '') + (it.subject || 'Taak');
+    row.querySelector('small').textContent = it.what + ' · ' + nice(it.date);
+    row.querySelector('.go').onclick = () => ask(`Vertel me meer over: ${it.subject} ${it.what}. Wat moet ik doen en wat zijn de succescriteria?`);
+    box.appendChild(row);
+  });
+  // weeks
+  const colors = ['var(--pink)', 'var(--orange)', 'var(--blue)'];
+  const wc = $('#weekCards'); wc.innerHTML = '';
+  (s.weeks || []).forEach((w, i) => {
+    const c = document.createElement('div'); c.className = 'wk'; c.style.background = colors[i % 3];
+    c.innerHTML = `<div class="top"><span class="dot" style="width:46px;height:46px;background:var(--black);color:#fff">${icon('folder')}</span><span class="cnt"></span></div><h4></h4><p></p>`;
+    c.querySelector('.cnt').textContent = (w.docs || []).length;
+    c.querySelector('h4').textContent = 'Week ' + String(w.week).padStart(2, '0');
+    c.querySelector('p').textContent = (w.label || '').split('· ')[1] || '';
+    let folder = '';
+    if (!(w.docs || []).length) { const p = document.createElement('p'); p.textContent = 'Nog niets geüpload'; c.appendChild(p); }
+    for (const d of w.docs || []) {
+      const url = /^https?:/.test(d.url || '') ? d.url : `/api/school/file?week=${w.week}&name=${encodeURIComponent(d.name)}&key=${encodeURIComponent(KEY)}`;
+      if (!folder && /^https?:/.test(d.folder_url || '')) folder = d.folder_url;
+      const a = document.createElement('a'); a.className = 'link'; a.href = url; a.target = '_blank'; a.rel = 'noopener';
+      a.innerHTML = `<i style="color:#fff">${icon('arrow')}</i>`; a.appendChild(document.createTextNode(d.name.replace('.pdf', '').replace(' week ' + w.week, '')));
+      c.appendChild(a);
+    }
+    if (folder) { const a = document.createElement('a'); a.className = 'pill'; a.href = folder; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'OPEN MAP'; a.style.marginTop = '8px'; a.style.alignSelf = 'flex-start'; c.appendChild(a); }
+    wc.appendChild(c);
+  });
+}
+
+// ---- upload (PDF or photos -> PDF + small JPEGs for the AI)
+document.querySelectorAll('#kinds .chip').forEach(b => b.onclick = () => {
+  kind = b.dataset.kind; document.querySelectorAll('#kinds .chip').forEach(x => x.classList.toggle('on', x === b));
+});
+$('#wkMinus').onclick = () => { if (week > 1) { week--; $('#wkVal').textContent = 'Week ' + week; } };
+$('#wkPlus').onclick = () => { if (week < 60) { week++; $('#wkVal').textContent = 'Week ' + week; } };
+$('#pick').onclick = () => $('#file').click();
+
+function canvasJpeg(canvas) {
+  // small enough for the vision AI (~170 KB)
+  let w = canvas.width, h = canvas.height, s = Math.min(1, 1400 / Math.max(w, h));
+  const c = document.createElement('canvas'); c.width = Math.round(w * s); c.height = Math.round(h * s);
+  c.getContext('2d').drawImage(canvas, 0, 0, c.width, c.height);
+  for (let q = 0.7; q >= 0.3; q -= 0.1) { const u = c.toDataURL('image/jpeg', q); if (u.length * 0.75 < 170000) return u.split(',')[1]; }
+  return c.toDataURL('image/jpeg', 0.3).split(',')[1];
+}
+const toB64 = buf => { let s = '', b = new Uint8Array(buf); for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(s); };
+const loadImg = f => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = URL.createObjectURL(f); });
+
+$('#file').onchange = async e => {
+  const files = [...e.target.files]; e.target.value = ''; if (!files.length) return;
+  const st = $('#upStatus'); st.textContent = 'Bezig…';
+  try {
+    let pdfB64, pages = [];
+    const pdf = files.find(f => f.type === 'application/pdf');
+    if (pdf) {
+      const buf = await pdf.arrayBuffer(); pdfB64 = toB64(buf);
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      const doc = await pdfjsLib.getDocument({ data: buf.slice(0) }).promise;
+      for (let p = 1; p <= Math.min(doc.numPages, 12); p++) {
+        const page = await doc.getPage(p), vp = page.getViewport({ scale: 1.6 });
+        const c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height;
+        await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+        pages.push(canvasJpeg(c));
+      }
+    } else {
+      const { jsPDF } = window.jspdf; let out = null;
+      for (const f of files.filter(f => f.type.startsWith('image/')).slice(0, 12)) {
+        const img = await loadImg(f);
+        const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight; c.getContext('2d').drawImage(img, 0, 0);
+        const jpg = canvasJpeg(c); pages.push(jpg);
+        const o = c.width > c.height ? 'l' : 'p';
+        if (!out) out = new jsPDF({ orientation: o, unit: 'px', format: [c.width, c.height] }); else out.addPage([c.width, c.height], o);
+        out.addImage('data:image/jpeg;base64,' + jpg, 'JPEG', 0, 0, c.width, c.height);
+      }
+      if (!out) throw new Error('geen PDF of foto gekozen');
+      pdfB64 = out.output('datauristring').split(',')[1];
+    }
+    st.textContent = 'Versturen…';
+    const r = await api('/api/school/upload', { method: 'POST', body: JSON.stringify({ kind, week, pdf: pdfB64, pages }) });
+    st.textContent = 'Bewaard: ' + r.doc.name + '. Jarvis leest het nu, het antwoord komt in de chat.';
+    loadState();
+  } catch (err) { st.textContent = 'Niet gelukt: ' + err.message; }
+};
+
+// ---- start (poll only while the tab is visible, so it stays light)
+let timer;
+function start() {
+  $('#login').classList.add('hide'); $('#app').classList.remove('hide');
+  lastId = ''; fetchNew(); loadState();
+  clearInterval(timer);
+  timer = setInterval(() => { if (document.visibilityState === 'visible') fetchNew(); }, 5000);
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && KEY) { fetchNew(); loadState(); } });
+if (KEY) api('/api/school/state').then(start).catch(() => logout()); else logout();
+</script>
+</body>
+</html>

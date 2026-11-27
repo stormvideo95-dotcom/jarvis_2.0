@@ -75,6 +75,8 @@ App: **Releases → Jarvis School** (JarvisSchool.apk). ⚙ Instellen: Pi addres
   the success criteria. Mistakes go to the chat. **Monday 18:00**: reminds you to scan the new planner.
 - By voice too: *"Jarvis, wat moet ik doen voor NW?"*, *"overhoor me voor mijn toets NW"*.
 - Drive setup (once): [`school-drive/README.md`](school-drive/README.md).
+- **Web chat** (Mac/laptop, saves phone battery): open `http://192.168.0.249:8790/school/` and log in with `JARVIS_KEY`.
+  Same chat, roadmap and week folders; upload a planner as PDF or photos.
 
 ## Say "stop"
 

@@ -32,6 +32,7 @@ app = FastAPI(title="Jarvis 2.0")
 app.mount("/audio", StaticFiles(directory=AUDIO), name="audio")
 os.makedirs(music.CACHE, exist_ok=True)
 app.mount("/media", StaticFiles(directory=music.CACHE), name="media")   # songs for the Nest
+app.mount("/school", StaticFiles(directory=Path(__file__).parent / "school_web", html=True), name="school")   # Jarvis School web chat
 nest = Nest()
 history: deque = deque(maxlen=20)
 
