@@ -61,6 +61,21 @@ stored only in `.env` as `STUDY_JARVIS_TOKEN`.
 - French words are spoken with a French voice.
 - Site down? Jarvis uses the cache and queues answers until the site is back.
 
+## Jarvis School (school buddy)
+
+App: **Releases → Jarvis School** (JarvisSchool.apk). ⚙ Instellen: Pi address + `JARVIS_KEY`.
+
+- **📄 Scan**: scan your planner or studiewijzer like a document (many pages, gallery import). Jarvis saves the PDF in
+  Google Drive (**Jarvis School → Week 03 · 23–27 nov**) and reads your tests and tasks.
+- **💬 Jarvis**: chat about school. Answers come with link buttons (opdracht, succescriteria, document, Storm Study).
+  "Ik ben mijn Franse taak vergeten" → Jarvis remembers it.
+- **📁 Weken**: every week's documents, tests and what's coming.
+- Reads the LAB project site (`SCHOOL_SITE`, Z-route) for this week's pages and success criteria.
+- **19:00 the evening before a test** Jarvis says it on the Nest: "Zullen we even studeren?" → "ja" → 10 questions from
+  the success criteria. Mistakes go to the chat. **Monday 18:00**: reminds you to scan the new planner.
+- By voice too: *"Jarvis, wat moet ik doen voor NW?"*, *"overhoor me voor mijn toets NW"*.
+- Drive setup (once): [`school-drive/README.md`](school-drive/README.md).
+
 ## Say "stop"
 
 While Jarvis is talking you can say **stop** (or stoppen, zwijg, hou op, genoeg) and it goes quiet right away.
