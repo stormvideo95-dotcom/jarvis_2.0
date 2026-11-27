@@ -197,7 +197,8 @@ class MainActivity : Activity() {
             layoutParams = LinearLayout.LayoutParams(dp(48), dp(48))
         })
         hero.addView(top)
-        hero.addView(Ui.text(this, "Scan je planner\nen studiewijzer", 26f, Ui.BLACK, bold = true).apply { setPadding(0, dp(18), 0, 0) })
+        if (pages.isEmpty()) hero.addView(Ui.illustration(this, R.drawable.ill_scan, 200))
+        hero.addView(Ui.text(this, "Scan je planner\nen studiewijzer", 26f, Ui.BLACK, bold = true).apply { setPadding(0, dp(10), 0, 0) })
         hero.addView(Ui.text(this, "Zoveel pagina's als je wil, of kies foto's uit je galerij", 14f, 0xFF3A3F55.toInt()).apply { setPadding(0, dp(6), 0, 0) })
         hero.addView(Ui.pill(this, if (pages.isEmpty()) "SCAN PAGINA'S" else "OPNIEUW SCANNEN") { startScanner() })
         col.addView(hero)
@@ -479,7 +480,8 @@ class MainActivity : Activity() {
 
         // ---- blue roadmap card (like "Check your learning roadmap")
         val hero = Ui.card(this, Ui.BLUE, 32).apply { gravity = Gravity.CENTER_HORIZONTAL; setPadding(dp(18), dp(22), dp(18), dp(18)) }
-        hero.addView(Ui.text(this, "Check je toetsen en", 22f, Ui.BLACK).apply { gravity = Gravity.CENTER })
+        hero.addView(Ui.illustration(this, R.drawable.ill_week, 180))
+        hero.addView(Ui.text(this, "Check je toetsen en", 22f, Ui.BLACK).apply { gravity = Gravity.CENTER; setPadding(0, dp(6), 0, 0) })
         hero.addView(Ui.text(this, "taken van deze week", 22f, Ui.BLACK, bold = true).apply { gravity = Gravity.CENTER })
         hero.addView(Ui.text(this, weekLabel, 13f, 0xFF3A3F55.toInt()).apply { gravity = Gravity.CENTER; setPadding(0, dp(4), 0, 0) })
         val days = Ui.row(this).apply {
@@ -513,7 +515,13 @@ class MainActivity : Activity() {
         head.addView(Ui.text(this, "Binnenkort", 18f, bold = true), Ui.lp(0, weight = 1f))
         head.addView(Ui.text(this, "${items.size}", 13f, Ui.MUTED, bold = true))
         col.addView(head)
-        if (items.isEmpty()) col.addView(Ui.text(this, "Nog geen toetsen of taken. Scan je planner, of vertel Jarvis wat je moet doen.", 14f, Ui.MUTED))
+        if (items.isEmpty()) col.addView(Ui.card(this, Ui.BLUE, 28).apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            addView(Ui.illustration(this@MainActivity, R.drawable.ill_relax, 170))
+            addView(Ui.text(this@MainActivity, "Niets op de planning!", 18f, Ui.BLACK, bold = true).apply { gravity = Gravity.CENTER })
+            addView(Ui.text(this@MainActivity, "Scan je planner, of vertel Jarvis wat je moet doen.", 13f, 0xFF2A3050.toInt()).apply { gravity = Gravity.CENTER })
+            addView(Ui.pill(this@MainActivity, "SCAN PLANNER") { show("scan") })
+        })
         for ((i, it) in items.take(10).withIndex()) {
             val test = it.optString("kind") == "test"
             val first = i == 0
@@ -595,6 +603,11 @@ class MainActivity : Activity() {
     private fun settingsScreen() {
         val col = Ui.column(this)
         header(col, "Verbind de app met Jarvis")
+        col.addView(Ui.card(this, Ui.BLUE, 32).apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            addView(Ui.illustration(this@MainActivity, R.drawable.ill_connect, 190))
+            addView(Ui.text(this@MainActivity, "Koppel met Jarvis op je Pi", 18f, Ui.BLACK, bold = true).apply { gravity = Gravity.CENTER })
+        })
         val c = Ui.card(this)
         c.addView(Ui.text(this, "Jarvis-adres (thuis-wifi)", 13f, Ui.MUTED))
         val url = Ui.field(this, "http://192.168.0.249:8790", Api.url(this)).apply { layoutParams = Ui.lp(top = dp(6)) }

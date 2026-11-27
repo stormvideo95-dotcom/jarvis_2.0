@@ -19,8 +19,8 @@ object Ui {
     const val WHITE = 0xFFFFFFFF.toInt()
     const val SOFT = 0xFFEFF1F5.toInt()      // light grey chips / Jarvis bubbles
     const val LINE = 0xFFE4E7EE.toInt()
-    const val BLUE = 0xFFA3B8FF.toInt()      // main soft blue
-    const val BLUE_DARK = 0xFF7F96F0.toInt()
+    const val BLUE = 0xFF88A7FF.toInt()      // main soft blue (same as the illustrations)
+    const val BLUE_DARK = 0xFF5F7FE8.toInt()
     const val BLUE_TINT = 0xFFE5EBFF.toInt()
     const val PINK = 0xFFE7A6F5.toInt()
     const val ORANGE = 0xFFF39A35.toInt()
@@ -143,6 +143,15 @@ object Ui {
         setPadding(dp(ctx, 16), dp(ctx, 14), dp(ctx, 16), dp(ctx, 14))
         isSingleLine = single
         if (!single) maxLines = 5
+    }
+
+    /** Full-width illustration (they share the card's blue background, so they blend in). */
+    fun illustration(ctx: Context, res: Int, maxH: Int = 190) = ImageView(ctx).apply {
+        setImageResource(res)
+        adjustViewBounds = true
+        scaleType = ImageView.ScaleType.FIT_CENTER
+        maxHeight = dp(ctx, maxH)
+        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
     }
 
     fun spacer(ctx: Context) = View(ctx).apply { layoutParams = LinearLayout.LayoutParams(0, 1, 1f) }
